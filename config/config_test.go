@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"fmt"
@@ -28,8 +28,8 @@ func TestParseConfiguredSecrets(t *testing.T) {
 			expected: []ConfiguredSecret{
 				ConfiguredSecret{
 					name:      "",
-					vaultPath: "/kv/data/foo",
-					filePath:  "/tmp/vault/secret.json",
+					VaultPath: "/kv/data/foo",
+					FilePath:  "/tmp/vault/secret.json",
 				},
 			},
 		},
@@ -42,8 +42,8 @@ func TestParseConfiguredSecrets(t *testing.T) {
 			expected: []ConfiguredSecret{
 				ConfiguredSecret{
 					name:      "",
-					vaultPath: "/kv/data/foo",
-					filePath:  "/tmp/vault/secret/foo",
+					VaultPath: "/kv/data/foo",
+					FilePath:  "/tmp/vault/secret/foo",
 				},
 			},
 		},
@@ -58,13 +58,13 @@ func TestParseConfiguredSecrets(t *testing.T) {
 			expected: []ConfiguredSecret{
 				ConfiguredSecret{
 					name:      "",
-					vaultPath: "/kv/data/foo",
-					filePath:  "/tmp/vault/secret/foo",
+					VaultPath: "/kv/data/foo",
+					FilePath:  "/tmp/vault/secret/foo",
 				},
 				ConfiguredSecret{
 					name:      "FOO",
-					vaultPath: "FOO vaultPath",
-					filePath:  "/FOO/file/path",
+					VaultPath: "FOO vaultPath",
+					FilePath:  "/FOO/file/path",
 				},
 			},
 		},
@@ -80,18 +80,18 @@ func TestParseConfiguredSecrets(t *testing.T) {
 			expected: []ConfiguredSecret{
 				ConfiguredSecret{
 					name:      "",
-					vaultPath: "default location",
-					filePath:  "/tmp/vault/secret.json",
+					VaultPath: "default location",
+					FilePath:  "/tmp/vault/secret.json",
 				},
 				ConfiguredSecret{
 					name:      "ABSOLUTE",
-					vaultPath: "a",
-					filePath:  "/somewhere/else/completely",
+					VaultPath: "a",
+					FilePath:  "/somewhere/else/completely",
 				},
 				ConfiguredSecret{
 					name:      "RELATIVE",
-					vaultPath: "a",
-					filePath:  "/tmp/vault/my-special-location.yaml",
+					VaultPath: "a",
+					FilePath:  "/tmp/vault/my-special-location.yaml",
 				},
 			},
 		},
@@ -112,7 +112,7 @@ func TestParseConfiguredSecrets(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setenv(tc.env)
-			secrets, err := parseConfiguredSecrets()
+			secrets, err := ParseConfiguredSecrets()
 			if err != nil {
 				if tc.expectErrors == 0 {
 					t.Fatalf("Expected no errors, but got: %s", err)
