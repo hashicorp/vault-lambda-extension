@@ -25,7 +25,7 @@ var (
 )
 
 func main() {
-	logger := log.New(os.Stdout, fmt.Sprintf("[%s]", extensionName), log.Ldate|log.Ltime|log.LUTC)
+	logger := log.New(os.Stderr, fmt.Sprintf("[%s] ", extensionName), log.Ldate|log.Ltime|log.LUTC)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sigs := make(chan os.Signal, 1)
@@ -84,8 +84,7 @@ func initialiseExtension(logger *log.Logger) {
 		// Will block until shutdown event is received or cancelled via the context.
 		secret, err := client.Logical().Read(s.VaultPath)
 		if err != nil {
-			logger.Printf("error reading secret: %s", err)
-			continue
+			logger.Fatalf("error reading secret: %s", err)
 		}
 
 		content, err := json.MarshalIndent(secret, "", "  ")

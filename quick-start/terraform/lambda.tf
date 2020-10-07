@@ -5,7 +5,7 @@ resource "aws_lambda_function" "function" {
   filename      = "../demo-function/demo-function.zip"
   handler       = "main"
   runtime       = "provided.al2"
-  layers        = ["arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension-test:1"]
+  layers        = ["arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension-test:3"]
 
   environment {
     variables = {
