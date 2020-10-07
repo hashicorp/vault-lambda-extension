@@ -11,7 +11,7 @@ then
       exit 1
 fi
 
-if [ -z "$(git status --porcelain)" ]; then 
+if output=$(git status --porcelain) && [ -z "$output" ]; then
   echo "-- clean"
 else 
   echo "-- not clean"
