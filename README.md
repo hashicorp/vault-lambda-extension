@@ -16,7 +16,7 @@ and writes the result as JSON to disk. It also writes a vault token to
 
 ## Getting Started
 
-### Quickstart
+### Quick Start
 
 The [quick-start](./quick-start) directory has a fully worked example, for which
 you will need an AWS account and some comand line tools. Follow the readme in
