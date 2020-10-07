@@ -3,6 +3,7 @@
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+echo "Tagging and publishing Vault Lambda layer to ${region}..."
 
 GIT_TAG=$1
 if [ -z $GIT_TAG ]
@@ -12,15 +13,20 @@ then
 fi
 
 if output=$(git status --porcelain --untracked-files=no) && [ -z "$output" ]; then
-  echo "-- clean"
+  echo "Tagging ${GIT_TAG}"
 else 
-  echo "-- not clean"
+  echo "Working directory is not clean, exiting"
+  exit 1
 fi
 
 echo "Git Tag: ${GIT_TAG}"
 
-echo "fail through"
-exit 0 
+MSG="Vault AWS Lambda Extension ${GIT_TAG}"
+
+git tag -a "${GIT_TAG}" -m "${MSG}"
+git push --follow-tags origin main
+
+exit
 
 REGIONS=(
   ap-northeast-1
