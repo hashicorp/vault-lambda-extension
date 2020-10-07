@@ -42,6 +42,8 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	initialiseExtension(logger)
+
 	processEvents(ctx, logger)
 }
 
