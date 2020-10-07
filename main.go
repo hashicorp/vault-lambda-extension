@@ -83,7 +83,14 @@ func main() {
 		log.Fatalf("%s: nil client returned: %s", printPrefix, err)
 	}
 
-	err = ioutil.WriteFile("/tmp/vault_token", []byte(client.Token()), 0644)
+	if _, err = os.Stat(defaultSecretDirectory); os.IsNotExist(err) {
+		err = os.MkdirAll(defaultSecretDirectory, 0755)
+		if err != nil {
+			log.Fatalf("Failed to create directory /tmp/vault: %s", err)
+		}
+	}
+
+	err = ioutil.WriteFile(path.Join(defaultSecretDirectory, "token"), []byte(client.Token()), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -102,7 +109,7 @@ func main() {
 		}
 		dir := path.Dir(s.filePath)
 		if _, err = os.Stat(dir); os.IsNotExist(err) {
-			err = os.MkdirAll(dir, 0644)
+			err = os.MkdirAll(dir, 0755)
 			if err != nil {
 				log.Fatalf("%s: Failed to create directory %q for secret %s: %s", printPrefix, dir, s.name, err)
 			}
