@@ -1,7 +1,7 @@
 # vault-lambda-extension
 
 This repository contains the source code for Hashicorp's Vault AWS Lambda extension.
-The extension utilises the AWS Lambda Extensions API to read secrets from your
+The extension utilizes the AWS Lambda Extensions API to read secrets from your
 Vault deployment and write the result to disk before the Lambda function itself
 starts to execute. To use it, include the following ARN as a layer in your
 Lambda function:
@@ -18,7 +18,7 @@ and writes the result as JSON to disk. It also writes a vault token to
 
 ### Quick Start
 
-The [quick-start](./quick-start) directory has a fully worked example, for which
+The [quick-start](./quick-start) directory has an end to end example, for which
 you will need an AWS account and some command line tools. Follow the readme in
 that directory if you'd like to try out the extension from scratch. **Please
 note it will create real infrastructure with an associated cost as per AWS'
