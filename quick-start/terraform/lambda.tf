@@ -15,7 +15,7 @@ resource "aws_lambda_function" "function" {
       VAULT_SECRET_PATH_DB = "database/creds/lambda-function",
       VAULT_SECRET_FILE_DB = "/tmp/vault_secret.json",
       VAULT_SECRET_PATH    = "secret/myapp/config",
-      DATABASE_URL         = "${aws_db_instance.main.address}",
+      DATABASE_URL         = aws_db_instance.main.address
     }
   }
 }
