@@ -4,6 +4,24 @@ set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+GIT_TAG=$1
+if [ -z $GIT_TAG ]
+then
+      echo "empty git tag"
+      exit 1
+fi
+
+if [ -z "$(git status --porcelain)" ]; then 
+  echo "-- clean"
+else 
+  echo "-- not clean"
+fi
+
+echo "Git Tag: ${GIT_TAG}"
+
+echo "fail through"
+exit 0 
+
 REGIONS=(
   ap-northeast-1
   ap-northeast-2
