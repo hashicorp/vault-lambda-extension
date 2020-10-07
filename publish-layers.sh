@@ -11,7 +11,7 @@ then
       exit 1
 fi
 
-if output=$(git status --porcelain) && [ -z "$output" ]; then
+if output=$(git status --porcelain --untracked-files=no) && [ -z "$output" ]; then
   echo "-- clean"
 else 
   echo "-- not clean"
