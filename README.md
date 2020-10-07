@@ -19,7 +19,7 @@ and writes the result as JSON to disk. It also writes a vault token to
 ### Quick Start
 
 The [quick-start](./quick-start) directory has a fully worked example, for which
-you will need an AWS account and some comand line tools. Follow the readme in
+you will need an AWS account and some command line tools. Follow the readme in
 that directory if you'd like to try out the extension from scratch. **Please
 note it will create real infrastructure with an associated cost as per AWS'
 pricing.**
