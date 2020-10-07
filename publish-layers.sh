@@ -19,15 +19,6 @@ else
   exit 1
 fi
 
-echo "Git Tag: ${GIT_TAG}"
-
-MSG="Vault AWS Lambda Extension ${GIT_TAG}"
-
-git tag -a "${GIT_TAG}" -m "${MSG}"
-git push --follow-tags origin main
-
-exit
-
 REGIONS=(
   ap-northeast-1
   ap-northeast-2
@@ -65,12 +56,20 @@ zip -r extensions.zip extensions preview-extensions-ggqizro707
 
 LAYER_NAME="vault-lambda-extension"
 
+# Tag after we've successfully built
+echo "Git Tag: ${GIT_TAG}"
+
+MSG="Vault AWS Lambda Extension ${GIT_TAG}"
+
+git tag -a "${GIT_TAG}" -m "${MSG}"
+git push --follow-tags origin ${GIT_TAG}
+
 for region in "${REGIONS[@]}"; do
     echo "Publishing Vault Lambda layer to ${region}..."
     layer_version=$(aws lambda publish-layer-version \
         --layer-name $LAYER_NAME \
         --zip-file  "fileb://extensions.zip" \
-        --description "HashiCorp Vault Lambda extension" \
+        --description "${MSG}" \
         --region $region \
         --output text \
         --query Version)
