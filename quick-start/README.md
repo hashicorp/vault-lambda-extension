@@ -1,6 +1,8 @@
 # Vault Lambda extension Quick Start
 
-Creates the infrastructure required for running a demo of the Vault Lambda extension:
+Creates the infrastructure required for running a demo of the Vault Lambda extension.
+All of the infrastructure is created in `us-east-1` by default, unless you
+specify `-var aws_region=...` during `terraform apply`.
 
 * An EC2 instance with a vault server running on it with auto-unseal from KMS
 * A new SSH key pair used to SSH into the instance
@@ -21,7 +23,7 @@ purposes only.**
 * Golang
 * Terraform
 * AWS account with access key ID and secret access key
-* AWS CLI configured with the same account
+* AWS CLI v2 configured with the same account
 
 ## Usage
 
