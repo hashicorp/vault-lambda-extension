@@ -48,7 +48,6 @@ func HandleRequest(ctx context.Context, payload Payload) error {
 	if err != nil {
 		return fmt.Errorf("error reading file: %w", err)
 	}
-	logger.Println("raw token:", string(tokenRaw))
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
