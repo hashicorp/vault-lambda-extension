@@ -3,6 +3,21 @@
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+echo "Tagging and publishing Vault Lambda layer to ${region}..."
+
+GIT_TAG=$1
+if [ -z $GIT_TAG ]
+then
+      echo "empty git tag"
+      exit 1
+fi
+
+if output=$(git status --porcelain --untracked-files=no) && [ -z "$output" ]; then
+  echo "Tagging ${GIT_TAG}"
+else 
+  echo "Working directory is not clean, exiting"
+  exit 1
+fi
 
 REGIONS=(
   ap-northeast-1
@@ -41,12 +56,20 @@ zip -r extensions.zip extensions preview-extensions-ggqizro707
 
 LAYER_NAME="vault-lambda-extension"
 
+# Tag after we've successfully built
+echo "Git Tag: ${GIT_TAG}"
+
+MSG="Vault AWS Lambda Extension ${GIT_TAG}"
+
+git tag -a "${GIT_TAG}" -m "${MSG}"
+git push --follow-tags origin ${GIT_TAG}
+
 for region in "${REGIONS[@]}"; do
     echo "Publishing Vault Lambda layer to ${region}..."
     layer_version=$(aws lambda publish-layer-version \
         --layer-name $LAYER_NAME \
         --zip-file  "fileb://extensions.zip" \
-        --description "HashiCorp Vault Lambda extension" \
+        --description "${MSG}" \
         --region $region \
         --output text \
         --query Version)
