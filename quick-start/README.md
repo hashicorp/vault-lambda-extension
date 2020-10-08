@@ -9,7 +9,7 @@ Creates the infrastructure required for running a demo of the Vault Lambda exten
 * A Lambda function which requests database credentials from the extension and then uses them to list users on the database
 
 **NB: This demo will create real infrastructure in AWS with an associated
-cost. Make sure you tear down the infrastructure once you are finished with 
+cost. Make sure you tear down the infrastructure once you are finished with
 the demo.**
 
 **NB: This is not a production-ready deployment, and is for demonstration

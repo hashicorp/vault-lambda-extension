@@ -7,8 +7,13 @@ starts to execute. To use it, include the following ARN as a layer in your
 Lambda function:
 
 ```text
-TBD
+arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:6
 ```
+
+Where region may be any of `ap-northeast-1`, `ap-northeast-2`, `ap-south-1`,
+`ap-southeast-1`, `ap-southeast-2`, `ca-central-1`, `eu-central-1`,
+`eu-west-1`, `eu-west-2`, `eu-west-3`, `sa-east-1`, `us-east-1`, `us-east-2`,
+`us-west-1`, `us-west-2`.
 
 The extension authenticates with Vault using [AWS IAM auth][vault-aws-iam-auth],
 and writes the result as JSON to disk. It also writes a vault token to
@@ -48,7 +53,7 @@ vault write auth/aws/role/vault-lambda-role \
 Add the extension to your Lambda layers using the console or [cli][lambda-add-layer-cli]:
 
 ```text
-TBD
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:6
 ```
 
 Configure the extension using [Lambda environment variables][lambda-env-vars]:
