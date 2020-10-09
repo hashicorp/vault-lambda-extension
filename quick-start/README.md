@@ -1,13 +1,16 @@
 # Vault Lambda extension Quick Start
 
-Creates the infrastructure required for running a demo of the Vault Lambda extension.
-All of the infrastructure is created in `us-east-1` by default, unless you
-specify `-var aws_region=...` during `terraform apply`.
+This quick start folder has terraform and an example function for creating all the
+infrastructure you need to run a demo of the Vault Lambda extension. By default,
+the infrastructure is created in `us-east-1`. See [variables.tf](terraform/variables.tf)
+for the available variables, including region and instance types.
 
-* An EC2 instance with a vault server running on it with auto-unseal from KMS
+The terraform will create:
+
+* An EC2 instance with a configured Vault server
 * A new SSH key pair used to SSH into the instance
-* IAM role for the Lambda to run as, which will be able to auth against the Vault instance using AWS IAM auth
-* Configures Vault
+* IAM role for the Lambda to run as, configured for AWS IAM auth on Vault
+* An RDS database for which Vault can manage dynamic credentials
 * A Lambda function which requests database credentials from the extension and then uses them to list users on the database
 
 **NB: This demo will create real infrastructure in AWS with an associated
