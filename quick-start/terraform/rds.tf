@@ -8,7 +8,7 @@ resource "aws_db_instance" "main" {
   storage_type           = "gp2"
   engine                 = "postgres"
   engine_version         = "12.3"
-  instance_class         = "db.t2.micro"
+  instance_class         = var.db_instance_type
   name                   = "lambdadb"
   username               = "vaultadmin"
   password               = random_password.password.result

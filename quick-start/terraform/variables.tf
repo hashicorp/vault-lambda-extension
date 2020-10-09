@@ -17,3 +17,8 @@ variable "vault_zip_file" {
 variable "instance_type" {
   default = "t2.micro"
 }
+
+# DB instance size
+variable "db_instance_type" {
+  default = "db.t2.micro"
+}
