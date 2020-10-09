@@ -3,7 +3,7 @@
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-echo "Tagging and publishing Vault Lambda layer to ${region}..."
+echo "Tagging and publishing Vault Lambda layer..."
 
 GIT_TAG=$1
 if [ -z $GIT_TAG ]
@@ -44,16 +44,12 @@ mkdir -p pkg/extensions
 # in case this already exists, clear it out prior to zip
 rm -f pkg/extensions/*.* 2> /dev/null
 
-# Create temporary magic-file, to activate extensions in multiple regions. This
-# can be removed after general availability of the API
-touch pkg/preview-extensions-ggqizro707
-
 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w' -a -o pkg/extensions/vault-lambda-extension main.go
 echo ""
 
 pushd pkg
 rm -f extensions.zip 2> /dev/null
-zip -r extensions.zip extensions preview-extensions-ggqizro707
+zip -r extensions.zip extensions
 
 LAYER_NAME="vault-lambda-extension"
 
