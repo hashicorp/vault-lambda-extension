@@ -44,10 +44,10 @@ func HandleRequest(ctx context.Context, payload Payload) error {
 	}
 
 	// read token
-	tokenRaw, err := ioutil.ReadFile("/tmp/vault/token")
-	if err != nil {
-		return fmt.Errorf("error reading file: %w", err)
-	}
+	// tokenRaw, err := ioutil.ReadFile("/tmp/vault/token")
+	// if err != nil {
+	// 	return fmt.Errorf("error reading file: %w", err)
+	// }
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
