@@ -6,6 +6,7 @@ resource "aws_instance" "vault-server" {
   instance_type               = var.instance_type
   key_name                    = aws_key_pair.main.key_name
   vpc_security_group_ids      = [aws_security_group.vault-server.id]
+  subnet_id                   = aws_subnet.first_subnet.id
   associate_public_ip_address = true
   iam_instance_profile        = aws_iam_instance_profile.vault-server.id
 
