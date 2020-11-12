@@ -51,7 +51,12 @@ func initialiseExtension(logger *log.Logger) {
 	logger.Println("Initialising")
 
 	vaultAddr := os.Getenv("VAULT_ADDR")
+
 	vaultAuthRole := os.Getenv("VAULT_AUTH_ROLE")
+	if vaultAuthRole == "" {
+		vaultAuthRole = os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
+	}
+
 	vaultAuthProvider := os.Getenv("VAULT_AUTH_PROVIDER")
 
 	configuredSecrets, err := config.ParseConfiguredSecrets()
@@ -59,8 +64,8 @@ func initialiseExtension(logger *log.Logger) {
 		logger.Fatalf("Failed to parse configured secrets to read: %s", err)
 	}
 
-	if vaultAddr == "" || vaultAuthProvider == "" || vaultAuthRole == "" || len(configuredSecrets) == 0 {
-		logger.Fatal("missing VAULT_ADDR, VAULT_AUTH_PROVIDER, VAULT_AUTH_ROLE, or VAULT_SECRET_ environment variables.")
+	if vaultAddr == "" || vaultAuthProvider == "" || len(configuredSecrets) == 0 {
+		logger.Fatal("missing VAULT_ADDR, VAULT_AUTH_PROVIDER, or VAULT_SECRET_ environment variables.")
 	}
 
 	client, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider)
