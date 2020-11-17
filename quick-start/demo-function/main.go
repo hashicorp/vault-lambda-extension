@@ -44,7 +44,7 @@ func HandleRequest(ctx context.Context, payload Payload) error {
 	}
 
 	// read token
-	tokenRaw, err := ioutil.ReadFile("/tmp/vault/token")
+	_, err = ioutil.ReadFile("/tmp/vault/token")
 	if err != nil {
 		return fmt.Errorf("error reading file: %w", err)
 	}
