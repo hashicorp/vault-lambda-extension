@@ -53,6 +53,7 @@ func initialiseExtension(logger *log.Logger) {
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	vaultAuthRole := os.Getenv("VAULT_AUTH_ROLE")
 	vaultAuthProvider := os.Getenv("VAULT_AUTH_PROVIDER")
+	vaultIamServerId = := os.Getenv("VAULT_IAM_SERVER_ID")	// Optional
 
 	configuredSecrets, err := config.ParseConfiguredSecrets()
 	if err != nil {
@@ -63,7 +64,7 @@ func initialiseExtension(logger *log.Logger) {
 		logger.Fatal("missing VAULT_ADDR, VAULT_AUTH_PROVIDER, VAULT_AUTH_ROLE, or VAULT_SECRET_ environment variables.")
 	}
 
-	client, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider)
+	client, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider, vaultIamServerId)
 	if err != nil {
 		logger.Fatalf("error getting client: %s", err)
 	} else if client == nil {
