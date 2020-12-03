@@ -29,13 +29,13 @@ func NewClient(logger *log.Logger, vaultAuthRole, vaultAuthProvider string, vaul
 		return nil, signErr
 	}
 
+	if vaultIamServerId != "" {
+		req.HTTPRequest.Header.Add("X-Vault-AWS-IAM-Server-ID", vaultIamServerId)
+	}
+
 	headers, err := json.Marshal(req.HTTPRequest.Header)
 	if err != nil {
 		return nil, err
-	}
-
-	if vaultIamServerId != "" {
-		headers.Add("X-Vault-AWS-IAM-Server-ID", vaultIamServerId)
 	}
 
 	body, err := ioutil.ReadAll(req.HTTPRequest.Body)
