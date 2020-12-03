@@ -25,12 +25,13 @@ func NewClient(logger *log.Logger, vaultAuthRole, vaultAuthProvider string, vaul
 
 	// ignore out
 	req, _ := stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
-	if signErr := req.Sign(); signErr != nil {
-		return nil, signErr
-	}
 
 	if vaultIamServerId != "" {
 		req.HTTPRequest.Header.Add("X-Vault-AWS-IAM-Server-ID", vaultIamServerId)
+	}
+
+	if signErr := req.Sign(); signErr != nil {
+		return nil, signErr
 	}
 
 	headers, err := json.Marshal(req.HTTPRequest.Header)
