@@ -53,7 +53,7 @@ func initialiseExtension(logger *log.Logger) {
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	vaultAuthRole := os.Getenv("VAULT_AUTH_ROLE")
 	vaultAuthProvider := os.Getenv("VAULT_AUTH_PROVIDER")
-	vaultIamServerId = := os.Getenv("VAULT_IAM_SERVER_ID")	// Optional
+	vaultIamServerId := os.Getenv("VAULT_IAM_SERVER_ID")	// Optional
 
 	configuredSecrets, err := config.ParseConfiguredSecrets()
 	if err != nil {
