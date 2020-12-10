@@ -37,6 +37,7 @@ Requirements:
 * An instance of Vault accessible from AWS Lambda
 * An authenticated `vault` client
 * A secret in Vault that you want your Lambda to access, and a policy giving read access to it
+* **Your Lambda function must use one of the [supported runtimes][lambda-supported-runtimes] for extensions**
 
 First, set up AWS IAM auth on Vault, and attach a policy to your ARN:
 
@@ -120,6 +121,7 @@ the lifetime of the secret.
 [vault-env-vars]: https://www.vaultproject.io/docs/commands#environment-variables
 [vault-api-secret-struct]: https://github.com/hashicorp/vault/blob/api/v1.0.4/api/secret.go#L15
 [vault-security-model]: https://www.vaultproject.io/docs/internals/security
+[lambda-supported-runtimes]: https://docs.aws.amazon.com/lambda/latest/dg/runtimes-extensions-api.html
 [lambda-env-vars]: https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html
 [lambda-add-layer-cli]: https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-using
 [lambda-provisioned-concurrency]: https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html#configuration-concurrency-provisioned
