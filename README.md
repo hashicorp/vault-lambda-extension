@@ -37,7 +37,7 @@ Requirements:
 * An instance of Vault accessible from AWS Lambda
 * An authenticated `vault` client
 * A secret in Vault that you want your Lambda to access, and a policy giving read access to it
-* **Your Lambda must run in one of the [lambda-supported-runtimes] for extensions**
+* **Your Lambda must use one of the [supported runtimes][lambda-supported-runtimes] for extensions**
 
 First, set up AWS IAM auth on Vault, and attach a policy to your ARN:
 
