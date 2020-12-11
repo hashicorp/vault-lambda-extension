@@ -101,6 +101,7 @@ Environment variable    | Description | Required | Example value
 `VAULT_CLIENT_CERT`     | Path to a PEM-encoded client certificate on the local disk | No | `/tmp/client.crt`
 `VAULT_CLIENT_KEY`      | Path to an unencrypted, PEM-encoded private key on disk which corresponds to the matching client certificate | No | `/tmp/client.key`
 `VAULT_CLIENT_TIMEOUT`  | Timeout for Vault requests. Default value is 60s. **Any value over 10s will exceed the Extensions API timeout and therefore have no effect** | No | `5s`
+`VAULT_IAM_SERVER_ID`   | Value to pass to the Vault server via the [`X-Vault-AWS-IAM-Server-ID` HTTP Header for AWS Authentication](https://www.vaultproject.io/api-docs/auth/aws#iam_server_id_header_value) | No | `vault.example.com`
 `VAULT_MAX_RETRIES`     | Maximum number of retries on `5xx` error codes. Defaults to 2 | No | `2`
 `VAULT_SKIP_VERIFY`     | Do not verify Vault's presented certificate before communicating with it. Setting this variable is not recommended and voids Vault's [security model][vault-security-model]  | No | `true`
 `VAULT_TLS_SERVER_NAME` | Name to use as the SNI host when connecting via TLS | No | `vault.example.com`
