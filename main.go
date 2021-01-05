@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/vault-lambda-extension/config"
 	"github.com/hashicorp/vault-lambda-extension/extension"
 	"github.com/hashicorp/vault-lambda-extension/vault"
+	"github.com/hashicorp/vault/api"
 )
 
 const (
@@ -53,15 +54,10 @@ func initialiseExtension(logger *log.Logger) {
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	vaultAuthRole := os.Getenv("VAULT_AUTH_ROLE")
 	vaultAuthProvider := os.Getenv("VAULT_AUTH_PROVIDER")
-	vaultIamServerId := os.Getenv("VAULT_IAM_SERVER_ID")	// Optional
+	vaultIamServerId := os.Getenv("VAULT_IAM_SERVER_ID") // Optional
 
-	configuredSecrets, err := config.ParseConfiguredSecrets()
-	if err != nil {
-		logger.Fatalf("Failed to parse configured secrets to read: %s", err)
-	}
-
-	if vaultAddr == "" || vaultAuthProvider == "" || vaultAuthRole == "" || len(configuredSecrets) == 0 {
-		logger.Fatal("missing VAULT_ADDR, VAULT_AUTH_PROVIDER, VAULT_AUTH_ROLE, or VAULT_SECRET_ environment variables.")
+	if vaultAddr == "" || vaultAuthProvider == "" || vaultAuthRole == "" {
+		logger.Fatal("missing VAULT_ADDR, VAULT_AUTH_PROVIDER or VAULT_AUTH_ROLE environment variables.")
 	}
 
 	client, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider, vaultIamServerId)
@@ -71,43 +67,57 @@ func initialiseExtension(logger *log.Logger) {
 		logger.Fatalf("nil client returned: %s", err)
 	}
 
-	if _, err = os.Stat(config.DefaultSecretDirectory); os.IsNotExist(err) {
+	err = writePreconfiguredSecrets(client)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	logger.Println("Initialised")
+}
+
+func writePreconfiguredSecrets(client *api.Client) error {
+	configuredSecrets, err := config.ParseConfiguredSecrets()
+	if err != nil {
+		return fmt.Errorf("Failed to parse configured secrets to read: %s", err)
+	}
+
+	if _, err := os.Stat(config.DefaultSecretDirectory); os.IsNotExist(err) {
 		err = os.MkdirAll(config.DefaultSecretDirectory, 0755)
 		if err != nil {
-			logger.Fatalf("Failed to create directory %s: %s", config.DefaultSecretDirectory, err)
+			return fmt.Errorf("Failed to create directory %s: %s", config.DefaultSecretDirectory, err)
 		}
 	}
 
 	err = ioutil.WriteFile(path.Join(config.DefaultSecretDirectory, "token"), []byte(client.Token()), 0644)
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
 
 	for _, s := range configuredSecrets {
 		// Will block until shutdown event is received or cancelled via the context.
 		secret, err := client.Logical().Read(s.VaultPath)
 		if err != nil {
-			logger.Fatalf("error reading secret: %s", err)
+			return fmt.Errorf("error reading secret: %s", err)
 		}
 
 		content, err := json.MarshalIndent(secret, "", "  ")
 		if err != nil {
-			logger.Fatalf("%s", err)
+			return err
 		}
 		dir := path.Dir(s.FilePath)
 		if _, err = os.Stat(dir); os.IsNotExist(err) {
 			err = os.MkdirAll(dir, 0755)
 			if err != nil {
-				logger.Fatalf("Failed to create directory %q for secret %s: %s", dir, s.Name(), err)
+				return fmt.Errorf("Failed to create directory %q for secret %s: %s", dir, s.Name(), err)
 			}
 		}
 		err = ioutil.WriteFile(s.FilePath, content, 0644)
 		if err != nil {
-			logger.Fatal(err)
+			return err
 		}
 	}
 
-	logger.Println("Initialised")
+	return nil
 }
 
 // processEvents polls the Lambda Extension API for events. Currently all this
