@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: api/
+  lambda:
+    build:
+      context: ../
+      dockerfile: test/lambda/Dockerfile
+    depends_on:
+      - api
+      - vault
+    environment:
+      # Configuration for vault-lambda-extension
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_AUTH_PROVIDER=aws
+      - VAULT_AUTH_ROLE=lambda-demo-function
+      # Configuration for the AWS extension client
+      - AWS_LAMBDA_RUNTIME_API=api
+      # Auth for vault-lambda-extension
+      # These key-only env vars use the host machine's values
+      - AWS_ROLE_ARN
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+  vault:
+    image: docker.mirror.hashicorp.services/vault:1.6.2
+    command: vault server -dev -log-level=err
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=root
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200

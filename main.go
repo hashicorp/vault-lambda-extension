@@ -3,16 +3,20 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
+	"time"
 
 	"github.com/hashicorp/vault-lambda-extension/config"
 	"github.com/hashicorp/vault-lambda-extension/extension"
+	"github.com/hashicorp/vault-lambda-extension/server"
 	"github.com/hashicorp/vault-lambda-extension/vault"
 	"github.com/hashicorp/vault/api"
 )
@@ -21,58 +25,110 @@ const (
 	extensionName = "vault-lambda-extension"
 )
 
-var (
-	extensionClient = extension.NewClient(os.Getenv("AWS_LAMBDA_RUNTIME_API"))
-)
-
 func main() {
 	logger := log.New(os.Stderr, fmt.Sprintf("[%s] ", extensionName), log.Ldate|log.Ltime|log.LUTC)
 	ctx, cancel := context.WithCancel(context.Background())
-
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		s := <-sigs
-		cancel()
-		logger.Println("Received", s)
-		logger.Println("Exiting")
-	}()
-
+	extensionClient := extension.NewClient(os.Getenv("AWS_LAMBDA_RUNTIME_API"))
 	_, err := extensionClient.Register(ctx, extensionName)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	initialiseExtension(logger)
+	threadFinishedCh := make(chan struct{}, 2)
+	srv, err := initialiseExtension(logger, threadFinishedCh)
+	if err != nil {
+		logger.Fatal(err)
+	}
 
-	processEvents(ctx, logger)
+	shutdownChannel := make(chan struct{})
+	go func() {
+		interruptChannel := make(chan os.Signal, 1)
+		signal.Notify(interruptChannel, syscall.SIGTERM, syscall.SIGINT)
+		select {
+		case s := <-interruptChannel:
+			logger.Printf("Received %s, exiting\n", s)
+		case <-shutdownChannel:
+			logger.Println("Received shutdown event, exiting")
+		}
+
+		cancel()
+		if err := srv.Shutdown(context.Background()); err != nil {
+			// Error from closing listeners, or context timeout:
+			logger.Printf("HTTP server shutdown error: %s\n", err)
+		}
+		threadFinishedCh <- struct{}{}
+	}()
+
+	processEvents(ctx, logger, extensionClient)
+
+	// Once processEvents returns, signal that it's time to shutdown.
+	shutdownChannel <- struct{}{}
+
+	// Ensure we wait for the HTTP server to gracefully shut down.
+	// One signal from the HTTP server thread and one from the shutdown thread.
+	<-threadFinishedCh
+	<-threadFinishedCh
+	logger.Println("Graceful shutdown complete")
 }
 
-func initialiseExtension(logger *log.Logger) {
+func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*http.Server, error) {
 	logger.Println("Initialising")
 
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	vaultAuthRole := os.Getenv("VAULT_AUTH_ROLE")
 	vaultAuthProvider := os.Getenv("VAULT_AUTH_PROVIDER")
-	vaultIamServerId := os.Getenv("VAULT_IAM_SERVER_ID") // Optional
+	vaultIAMServerID := os.Getenv("VAULT_IAM_SERVER_ID") // Optional
 
 	if vaultAddr == "" || vaultAuthProvider == "" || vaultAuthRole == "" {
-		logger.Fatal("missing VAULT_ADDR, VAULT_AUTH_PROVIDER or VAULT_AUTH_ROLE environment variables.")
+		return nil, errors.New("missing VAULT_ADDR, VAULT_AUTH_PROVIDER or VAULT_AUTH_ROLE environment variables")
 	}
 
-	client, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider, vaultIamServerId)
+	client, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider, vaultIAMServerID)
 	if err != nil {
-		logger.Fatalf("error getting client: %s", err)
+		return nil, fmt.Errorf("error getting client: %s", err)
 	} else if client == nil {
-		logger.Fatalf("nil client returned: %s", err)
+		return nil, fmt.Errorf("nil client returned: %s", err)
 	}
 
 	err = writePreconfiguredSecrets(client)
 	if err != nil {
-		logger.Fatal(err)
+		return nil, err
+	}
+
+	srv := server.New(logger, "127.0.0.1:8200", client)
+	go func() {
+		logger.Println("Starting HTTP server...")
+		err = srv.ListenAndServe()
+		if err != http.ErrServerClosed {
+			// Error starting or closing listener:
+			logger.Printf("HTTP server ListenAndServe: %s\n", err)
+		}
+		threadFinishedCh <- struct{}{}
+	}()
+
+	// Check the HTTP server is up and running before continuing.
+	// Wait up to ~2s total.
+	for wait := time.Millisecond; ; wait = wait * 2 {
+		resp, err := http.Get("http://127.0.0.1:8200/_health")
+		if err == nil && resp != nil && resp.StatusCode == 200 {
+			break
+		}
+		if wait >= 2*time.Second {
+			const errString = "HTTP server did not come up within 2s"
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", errString, err)
+			}
+			if resp != nil {
+				return nil, fmt.Errorf("%s: %d", errString, resp.StatusCode)
+			}
+			return nil, errors.New(errString)
+		}
+		time.Sleep(wait)
 	}
 
 	logger.Println("Initialised")
+
+	return srv, nil
 }
 
 func writePreconfiguredSecrets(client *api.Client) error {
@@ -123,7 +179,9 @@ func writePreconfiguredSecrets(client *api.Client) error {
 // processEvents polls the Lambda Extension API for events. Currently all this
 // does is signal readiness to the Lambda platform after each event, which is
 // required in the Extension API.
-func processEvents(ctx context.Context, logger *log.Logger) {
+// The first call to NextEvent signals completion of the extension
+// init phase.
+func processEvents(ctx context.Context, logger *log.Logger, extensionClient *extension.Client) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -132,12 +190,12 @@ func processEvents(ctx context.Context, logger *log.Logger) {
 			logger.Println("Waiting for event...")
 			res, err := extensionClient.NextEvent(ctx)
 			if err != nil {
-				logger.Fatalf("Error receiving event: %s", err)
+				logger.Printf("Error receiving event: %s\n", err)
+				return
 			}
 			logger.Println("Received event")
 			// Exit if we receive a SHUTDOWN event
 			if res.EventType == extension.Shutdown {
-				logger.Println("Received SHUTDOWN event, exiting")
 				return
 			}
 		}

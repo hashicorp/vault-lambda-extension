@@ -1,5 +1,9 @@
 ## Unreleased
 
+FEATURES:
+
+* Server mode: The extension now starts a Vault API proxy at 127.0.0.1:8200.
+
 ## v0.2.0 (January 20th, 2021)
 
 IMPROVEMENTS:

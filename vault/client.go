@@ -14,7 +14,7 @@ import (
 
 // NewClient uses the AWS IAM auth method configured in a Vault cluster to
 // authenticate the execution role and create a Vault API client.
-func NewClient(logger *log.Logger, vaultAuthRole, vaultAuthProvider string, vaultIamServerId string) (*api.Client, error) {
+func NewClient(logger *log.Logger, vaultAuthRole, vaultAuthProvider string, vaultIAMServerID string) (*api.Client, error) {
 	vaultClient, err := api.NewClient(nil)
 	if err != nil {
 		return nil, fmt.Errorf("error making extension: %w", err)
@@ -26,8 +26,8 @@ func NewClient(logger *log.Logger, vaultAuthRole, vaultAuthProvider string, vaul
 	// ignore out
 	req, _ := stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
 
-	if vaultIamServerId != "" {
-		req.HTTPRequest.Header.Add("X-Vault-AWS-IAM-Server-ID", vaultIamServerId)
+	if vaultIAMServerID != "" {
+		req.HTTPRequest.Header.Add("X-Vault-AWS-IAM-Server-ID", vaultIAMServerID)
 	}
 
 	if signErr := req.Sign(); signErr != nil {

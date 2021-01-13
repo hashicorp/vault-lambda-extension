@@ -18,7 +18,7 @@ func TestParseConfiguredSecrets(t *testing.T) {
 		{
 			name:         "Empty environment",
 			expected:     []ConfiguredSecret{},
-			expectErrors: 1,
+			expectErrors: 0,
 		},
 		{
 			name: "Minimal valid config",
