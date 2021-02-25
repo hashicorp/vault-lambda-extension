@@ -1,8 +1,6 @@
 package server
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -26,41 +24,39 @@ func New(logger *log.Logger, vaultClient *api.Client) *http.Server {
 // https://github.com/hashicorp/vault/blob/22b486b651b8956d32fb24e77cef4050df7094b6/command/agent/cache/api_proxy.go
 func proxyHandler(logger *log.Logger, vaultClient *api.Client) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cl, err := vaultClient.Clone()
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		cl.SetToken(vaultClient.Token())
-
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		logger.Printf("Proxying %s %s\n", r.Method, r.URL.Path)
-		resp, err := proxyRequest(cl, r, body)
-		if err != nil {
-			if resp != nil && resp.Error() != nil {
-				// If we got an api.Response error, we'll just return that below without modification.
+		resp, err := proxyRequest(vaultClient, r, body)
+		// resp will generally only be nil if the underlying HTTP transport errors.
+		if resp == nil {
+			if err == nil {
+				http.Error(w, "unexpected error while proxying, both response and error are nil", http.StatusBadGateway)
 			} else {
-				http.Error(w, err.Error(), 502)
-				return
+				http.Error(w, err.Error(), http.StatusBadGateway)
 			}
+			return
 		}
 
-		w.WriteHeader(resp.StatusCode)
+		// While the underlying http client almost always only sets one of resp
+		// or err, the Vault API client sets non-nil err for 4xx and 5xx codes
+		// etc from Vault, but in those cases we just want to proxy the response
+		// back to our client unchanged.
 		headers := w.Header()
 		for k, vv := range resp.Header {
 			for _, v := range vv {
 				headers.Add(k, v)
 			}
 		}
+		w.WriteHeader(resp.StatusCode)
 		defer resp.Body.Close()
 		_, err = io.Copy(w, resp.Body)
 		if err != nil {
-			http.Error(w, "failed to write response back to requester", 500)
+			http.Error(w, "failed to write response back to requester", http.StatusInternalServerError)
 			return
 		}
 		logger.Printf("Successfully proxied %s %s\n", r.Method, r.URL.Path)
@@ -82,18 +78,5 @@ func proxyRequest(client *api.Client, r *http.Request, body []byte) (*api.Respon
 		fwReq.Params = query
 	}
 
-	resp, err := client.RawRequestWithContext(r.Context(), fwReq)
-	if err != nil {
-		errString := fmt.Sprintf("failed to proxy request: %s", err)
-		if resp != nil {
-			defer resp.Body.Close()
-			body, err := ioutil.ReadAll(resp.Body)
-			errString += fmt.Sprintf("\n\n(%d) %s", resp.StatusCode, string(body))
-			if err != nil {
-				errString += fmt.Sprintf("\n\nfailed to read response body: %s", err)
-			}
-		}
-		return nil, errors.New(errString)
-	}
-	return resp, nil
+	return client.RawRequestWithContext(r.Context(), fwReq)
 }

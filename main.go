@@ -85,9 +85,9 @@ func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*h
 
 	client, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider, vaultIAMServerID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting client: %s", err)
+		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
-		return nil, fmt.Errorf("nil client returned: %s", err)
+		return nil, fmt.Errorf("nil client returned: %w", err)
 	}
 
 	err = writePreconfiguredSecrets(client)
@@ -118,7 +118,7 @@ func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*h
 func writePreconfiguredSecrets(client *api.Client) error {
 	configuredSecrets, err := config.ParseConfiguredSecrets()
 	if err != nil {
-		return fmt.Errorf("failed to parse configured secrets to read: %s", err)
+		return fmt.Errorf("failed to parse configured secrets to read: %w", err)
 	}
 
 	if _, err := os.Stat(config.DefaultSecretDirectory); os.IsNotExist(err) {
@@ -137,7 +137,7 @@ func writePreconfiguredSecrets(client *api.Client) error {
 		// Will block until shutdown event is received or cancelled via the context.
 		secret, err := client.Logical().Read(s.VaultPath)
 		if err != nil {
-			return fmt.Errorf("error reading secret: %s", err)
+			return fmt.Errorf("error reading secret: %w", err)
 		}
 
 		content, err := json.MarshalIndent(secret, "", "  ")
