@@ -7,6 +7,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/vault/api v1.0.4
+	github.com/hashicorp/vault/sdk v0.1.13
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/stretchr/testify v1.6.1

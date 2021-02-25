@@ -14,10 +14,14 @@ import (
 
 // NewClient uses the AWS IAM auth method configured in a Vault cluster to
 // authenticate the execution role and create a Vault API client.
-func NewClient(logger *log.Logger, vaultAuthRole, vaultAuthProvider string, vaultIAMServerID string) (*api.Client, error) {
-	vaultClient, err := api.NewClient(nil)
+func NewClient(logger *log.Logger, vaultAuthRole, vaultAuthProvider string, vaultIAMServerID string) (*api.Client, *api.Config, error) {
+	config := api.DefaultConfig()
+	if config.Error != nil {
+		return nil, nil, fmt.Errorf("error making default vault config for extension: %w", config.Error)
+	}
+	vaultClient, err := api.NewClient(config)
 	if err != nil {
-		return nil, fmt.Errorf("error making extension: %w", err)
+		return nil, nil, fmt.Errorf("error making extension: %w", err)
 	}
 
 	ses := session.Must(session.NewSession())
@@ -31,17 +35,17 @@ func NewClient(logger *log.Logger, vaultAuthRole, vaultAuthProvider string, vaul
 	}
 
 	if signErr := req.Sign(); signErr != nil {
-		return nil, signErr
+		return nil, nil, signErr
 	}
 
 	headers, err := json.Marshal(req.HTTPRequest.Header)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	body, err := ioutil.ReadAll(req.HTTPRequest.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	d := make(map[string]interface{})
@@ -54,19 +58,19 @@ func NewClient(logger *log.Logger, vaultAuthRole, vaultAuthProvider string, vaul
 	logger.Println("attemping Vault login...")
 	resp, err := vaultClient.Logical().Write(fmt.Sprintf("auth/%s/login", vaultAuthProvider), d)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if resp == nil {
-		return nil, fmt.Errorf("got no response from the %s authentication provider", vaultAuthProvider)
+		return nil, nil, fmt.Errorf("got no response from the %s authentication provider", vaultAuthProvider)
 	}
 
 	token, err := parseToken(resp)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing token: %s", err)
+		return nil, nil, fmt.Errorf("error parsing token: %s", err)
 	}
 	vaultClient.SetToken(token)
 
-	return vaultClient, nil
+	return vaultClient, config, nil
 }
 
 func parseToken(resp *api.Secret) (string, error) {

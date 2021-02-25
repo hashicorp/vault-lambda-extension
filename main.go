@@ -74,7 +74,7 @@ func main() {
 func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*http.Server, error) {
 	logger.Println("Initialising")
 
-	vaultAddr := os.Getenv("VAULT_ADDR")
+	vaultAddr := os.Getenv(api.EnvVaultAddress)
 	vaultAuthRole := os.Getenv("VAULT_AUTH_ROLE")
 	vaultAuthProvider := os.Getenv("VAULT_AUTH_PROVIDER")
 	vaultIAMServerID := os.Getenv("VAULT_IAM_SERVER_ID") // Optional
@@ -83,7 +83,7 @@ func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*h
 		return nil, errors.New("missing VAULT_ADDR, VAULT_AUTH_PROVIDER or VAULT_AUTH_ROLE environment variables")
 	}
 
-	client, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider, vaultIAMServerID)
+	client, config, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider, vaultIAMServerID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
@@ -99,7 +99,7 @@ func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*h
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
 	}
-	srv := server.New(logger, client)
+	srv := server.New(logger, config, client.Token())
 	go func() {
 		logger.Println("Starting HTTP server...")
 		err = srv.Serve(ln)

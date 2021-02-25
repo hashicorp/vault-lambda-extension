@@ -2,12 +2,14 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/vault/api"
@@ -20,41 +22,36 @@ type vaultResponse struct {
 	code   int
 }
 
-var fakeVaultResponse vaultResponse
+var (
+	fakeVaultResponse   vaultResponse
+	vaultResponseFooBar = vaultResponse{
+		secret: &api.Secret{
+			Data: map[string]interface{}{
+				"foo": "bar",
+			},
+		},
+	}
+	vaultResponse403 = vaultResponse{
+		err:  errors.New("forbidden"),
+		code: http.StatusForbidden,
+	}
+	vaultResponse500 = vaultResponse{
+		err:  errors.New("internal server error"),
+		code: http.StatusInternalServerError,
+	}
+	vaultResponse502 = vaultResponse{
+		err:  errors.New("bad gateway"),
+		code: http.StatusBadGateway,
+	}
+)
 
 func TestProxy(t *testing.T) {
 	vault := fakeVault()
-	cl, err := api.NewClient(&api.Config{
-		Address: vault.URL,
-	})
-	require.NoError(t, err)
-
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	proxy := New(log.New(ioutil.Discard, "[proxy server] ", 0), cl)
-	go func() {
-		_ = proxy.Serve(ln)
-	}()
-
-	proxyClient, err := api.NewClient(&api.Config{
-		Address: "http://" + ln.Addr().String(),
-	})
-
-	t.Run("_health endpoint works", func(t *testing.T) {
-		resp, err := http.Get(fmt.Sprintf("http://%s/_health", ln.Addr().String()))
-		require.NoError(t, err)
-		require.Equal(t, 200, resp.StatusCode)
-	})
+	proxyAddr := startProxy(t, vault.URL)
 
 	t.Run("happy path bare http client", func(t *testing.T) {
-		fakeVaultResponse = vaultResponse{
-			secret: &api.Secret{
-				Data: map[string]interface{}{
-					"foo": "bar",
-				},
-			},
-		}
-		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", ln.Addr().String()))
+		fakeVaultResponse = vaultResponseFooBar
+		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", proxyAddr))
 		require.NoError(t, err)
 		if resp.StatusCode != 200 {
 			body, err := ioutil.ReadAll(resp.Body)
@@ -70,17 +67,55 @@ func TestProxy(t *testing.T) {
 	})
 
 	t.Run("happy path with vault client", func(t *testing.T) {
-		fakeVaultResponse = vaultResponse{
-			secret: &api.Secret{
-				Data: map[string]interface{}{
-					"foo": "bar",
-				},
-			},
-		}
-		resp, err := proxyClient.Logical().Read("secret/data/foo")
+		fakeVaultResponse = vaultResponseFooBar
+		proxyVaultClient, err := api.NewClient(&api.Config{
+			Address: "http://" + proxyAddr,
+		})
+		resp, err := proxyVaultClient.Logical().Read("secret/data/foo")
 		require.NoError(t, err)
 		require.Equal(t, "bar", resp.Data["foo"])
 	})
+
+	t.Run("vault error codes should return unmodified", func(t *testing.T) {
+		for _, tc := range []vaultResponse{vaultResponse403, vaultResponse500, vaultResponse502} {
+			fakeVaultResponse = tc
+			resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", proxyAddr))
+			require.NoError(t, err)
+			require.Equal(t, tc.code, resp.StatusCode)
+		}
+	})
+
+	t.Run("failed upstream request should give 502", func(t *testing.T) {
+		// Set an invalid vault address scheme so that the HTTP request to vault fails.
+		brokenProxyAddr := startProxy(t, strings.ReplaceAll(vault.URL, "http://", "https://"))
+		fakeVaultResponse = vaultResponseFooBar
+		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", brokenProxyAddr))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusBadGateway, resp.StatusCode)
+	})
+
+	t.Run("failure to generate proxy request should give 500", func(t *testing.T) {
+		// Set an invalid vault address so that generating a proxy request fails.
+		brokenProxyAddr := startProxy(t, "@:::")
+		fakeVaultResponse = vaultResponseFooBar
+		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", brokenProxyAddr))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	})
+}
+
+func startProxy(t *testing.T, vaultAddress string) string {
+	config := api.DefaultConfig()
+	require.NoError(t, config.Error)
+	config.Address = vaultAddress
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	proxy := New(log.New(ioutil.Discard, "", 0), config, "")
+	go func() {
+		_ = proxy.Serve(ln)
+	}()
+
+	return ln.Addr().String()
 }
 
 func fakeVault() *httptest.Server {

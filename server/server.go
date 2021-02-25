@@ -1,18 +1,20 @@
 package server
 
 import (
+	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/hashicorp/vault/api"
+	"github.com/hashicorp/vault/sdk/helper/consts"
 )
 
 // New returns an unstarted HTTP server with health and proxy handlers.
-func New(logger *log.Logger, vaultClient *api.Client) *http.Server {
+func New(logger *log.Logger, config *api.Config, token string) *http.Server {
 	mux := http.ServeMux{}
-	mux.HandleFunc("/", proxyHandler(logger, vaultClient))
+	mux.HandleFunc("/", proxyHandler(logger, config, token))
 	srv := http.Server{
 		Handler: &mux,
 	}
@@ -20,32 +22,23 @@ func New(logger *log.Logger, vaultClient *api.Client) *http.Server {
 	return &srv
 }
 
-// The proxyHandler is based on the Send function from Vault Agent's proxy:
+// The proxyHandler borrows from the Send function in Vault Agent's proxy:
 // https://github.com/hashicorp/vault/blob/22b486b651b8956d32fb24e77cef4050df7094b6/command/agent/cache/api_proxy.go
-func proxyHandler(logger *log.Logger, vaultClient *api.Client) func(http.ResponseWriter, *http.Request) {
+func proxyHandler(logger *log.Logger, config *api.Config, token string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
 		logger.Printf("Proxying %s %s\n", r.Method, r.URL.Path)
-		resp, err := proxyRequest(vaultClient, r, body)
-		// resp will generally only be nil if the underlying HTTP transport errors.
-		if resp == nil {
-			if err == nil {
-				http.Error(w, "unexpected error while proxying, both response and error are nil", http.StatusBadGateway)
-			} else {
-				http.Error(w, err.Error(), http.StatusBadGateway)
-			}
+		fwReq, err := proxyRequest(r, config.Address, token)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to generate proxy request: %s", err), http.StatusInternalServerError)
 			return
 		}
 
-		// While the underlying http client almost always only sets one of resp
-		// or err, the Vault API client sets non-nil err for 4xx and 5xx codes
-		// etc from Vault, but in those cases we just want to proxy the response
-		// back to our client unchanged.
+		resp, err := config.HttpClient.Do(fwReq)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to proxy request: %s", err), http.StatusBadGateway)
+			return
+		}
+
 		headers := w.Header()
 		for k, vv := range resp.Header {
 			for _, v := range vv {
@@ -56,27 +49,33 @@ func proxyHandler(logger *log.Logger, vaultClient *api.Client) func(http.Respons
 		defer resp.Body.Close()
 		_, err = io.Copy(w, resp.Body)
 		if err != nil {
-			http.Error(w, "failed to write response back to requester", http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("failed to write response back to requester: %s", err), http.StatusInternalServerError)
 			return
 		}
 		logger.Printf("Successfully proxied %s %s\n", r.Method, r.URL.Path)
 	}
 }
 
-func proxyRequest(client *api.Client, r *http.Request, body []byte) (*api.Response, error) {
+func proxyRequest(r *http.Request, vaultAddress string, token string) (*http.Request, error) {
 	// http.Transport will transparently request gzip and decompress the response, but only if
 	// the client doesn't manually set the header. Removing any Accept-Encoding header allows the
 	// transparent compression to occur.
 	r.Header.Del("Accept-Encoding")
-	client.SetHeaders(r.Header)
 
-	fwReq := client.NewRequest(r.Method, r.URL.Path)
-	fwReq.BodyBytes = body
-
-	query := r.URL.Query()
-	if len(query) > 0 {
-		fwReq.Params = query
+	vault, err := url.Parse(vaultAddress)
+	if err != nil {
+		return nil, err
 	}
+	upstream := *r.URL
+	upstream.Scheme = vault.Scheme
+	upstream.Host = vault.Host
 
-	return client.RawRequestWithContext(r.Context(), fwReq)
+	fwReq, err := http.NewRequestWithContext(r.Context(), r.Method, upstream.String(), r.Body)
+	if err != nil {
+		return nil, err
+	}
+	fwReq.Header = r.Header
+	fwReq.Header.Add(consts.AuthHeaderName, token)
+
+	return fwReq, nil
 }

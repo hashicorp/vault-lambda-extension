@@ -100,15 +100,13 @@ Environment variable    | Description | Required | Example value
 `VAULT_CAPATH`          | Path to a _directory_ of PEM-encoded CA certificate files on the local disk | No | `/tmp/certs`
 `VAULT_CLIENT_CERT`     | Path to a PEM-encoded client certificate on the local disk | No | `/tmp/client.crt`
 `VAULT_CLIENT_KEY`      | Path to an unencrypted, PEM-encoded private key on disk which corresponds to the matching client certificate | No | `/tmp/client.key`
-`VAULT_CLIENT_TIMEOUT`  | Timeout for Vault requests. Default value is 60s. **Any value over 10s will exceed the Extensions API timeout and therefore have no effect** | No | `5s`
+`VAULT_CLIENT_TIMEOUT`  | Timeout for Vault requests. Default value is 60s. Ignored by proxy server. **Any value over 10s will exceed the Extensions API timeout and therefore have no effect** | No | `5s`
 `VAULT_IAM_SERVER_ID`   | Value to pass to the Vault server via the [`X-Vault-AWS-IAM-Server-ID` HTTP Header for AWS Authentication](https://www.vaultproject.io/api-docs/auth/aws#iam_server_id_header_value) | No | `vault.example.com`
-`VAULT_MAX_RETRIES`     | Maximum number of retries on `5xx` error codes. Defaults to 2 | No | `2`
+`VAULT_MAX_RETRIES`     | Maximum number of retries on `5xx` error codes. Defaults to 2. Ignored by proxy server | No | `2`
 `VAULT_SKIP_VERIFY`     | Do not verify Vault's presented certificate before communicating with it. Setting this variable is not recommended and voids Vault's [security model][vault-security-model]  | No | `true`
 `VAULT_TLS_SERVER_NAME` | Name to use as the SNI host when connecting via TLS | No | `vault.example.com`
-`VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details | No | `10`
-`VAULT_NAMESPACE`       | The namespace to use for the command | No | `education`
-`VAULT_SRV_LOOKUP`      | The Vault client will lookup DNS SRV records for the host. See [Vault Commands (CLI)][vault-env-vars] documentation for details | No | `true`
-`VAULT_MFA`             | MFA credentials. See [Vault Commands (CLI)][vault-env-vars] documentation for details | No | `true`
+`VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details. Ignored by proxy server | No | `10`
+`VAULT_NAMESPACE`       | The namespace to use for pre-configured secrets. Ignored by proxy server | No | `education`
 
 ## Limitations
 
