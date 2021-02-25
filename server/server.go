@@ -26,50 +26,44 @@ func New(logger *log.Logger, vaultClient *api.Client) *http.Server {
 // https://github.com/hashicorp/vault/blob/22b486b651b8956d32fb24e77cef4050df7094b6/command/agent/cache/api_proxy.go
 func proxyHandler(logger *log.Logger, vaultClient *api.Client) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			cl, err := vaultClient.Clone()
-			if err != nil {
-				http.Error(w, err.Error(), 500)
-				return
-			}
-			cl.SetToken(vaultClient.Token())
-
-			body, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, err.Error(), 500)
-				return
-			}
-
-			logger.Printf("Proxying %s %s\n", r.Method, r.URL.Path)
-			resp, err := proxyRequest(cl, r, body)
-			if err != nil {
-				if resp != nil && resp.Error() != nil {
-					// If we got an api.Response error, we'll just return that below without modification.
-				} else {
-					http.Error(w, err.Error(), 502)
-					return
-				}
-			}
-
-			w.WriteHeader(resp.StatusCode)
-			headers := w.Header()
-			for k, vv := range resp.Header {
-				for _, v := range vv {
-					headers.Add(k, v)
-				}
-			}
-			defer resp.Body.Close()
-			_, err = io.Copy(w, resp.Body)
-			if err != nil {
-				http.Error(w, "failed to write response back to requester", 500)
-				return
-			}
-			logger.Printf("Successfully proxied %s %s\n", r.Method, r.URL.Path)
-		default:
-			http.Error(w, fmt.Sprintf("unsupported method for vault-lambda-extension: %s", r.Method), 400)
+		cl, err := vaultClient.Clone()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
 			return
 		}
+		cl.SetToken(vaultClient.Token())
+
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		logger.Printf("Proxying %s %s\n", r.Method, r.URL.Path)
+		resp, err := proxyRequest(cl, r, body)
+		if err != nil {
+			if resp != nil && resp.Error() != nil {
+				// If we got an api.Response error, we'll just return that below without modification.
+			} else {
+				http.Error(w, err.Error(), 502)
+				return
+			}
+		}
+
+		w.WriteHeader(resp.StatusCode)
+		headers := w.Header()
+		for k, vv := range resp.Header {
+			for _, v := range vv {
+				headers.Add(k, v)
+			}
+		}
+		defer resp.Body.Close()
+		_, err = io.Copy(w, resp.Body)
+		if err != nil {
+			http.Error(w, "failed to write response back to requester", 500)
+			return
+		}
+		logger.Printf("Successfully proxied %s %s\n", r.Method, r.URL.Path)
 	}
 }
 
