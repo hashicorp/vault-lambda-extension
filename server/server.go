@@ -12,12 +12,10 @@ import (
 )
 
 // New returns an unstarted HTTP server with health and proxy handlers.
-func New(logger *log.Logger, proxyAddr string, vaultClient *api.Client) *http.Server {
+func New(logger *log.Logger, vaultClient *api.Client) *http.Server {
 	mux := http.ServeMux{}
-	mux.HandleFunc("/_health", healthHandler)
 	mux.HandleFunc("/", proxyHandler(logger, vaultClient))
 	srv := http.Server{
-		Addr:    proxyAddr,
 		Handler: &mux,
 	}
 
@@ -104,10 +102,4 @@ func proxyRequest(client *api.Client, r *http.Request, body []byte) (*api.Respon
 		return nil, errors.New(errString)
 	}
 	return resp, nil
-}
-
-// healthHandler is used to check that the server is running and accepting
-// connections before notifying the extensions API that we're initialised.
-func healthHandler(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(200)
 }

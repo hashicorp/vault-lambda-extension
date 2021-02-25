@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
-	"time"
 
 	"github.com/hashicorp/vault-lambda-extension/config"
 	"github.com/hashicorp/vault-lambda-extension/extension"
@@ -95,36 +95,20 @@ func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*h
 		return nil, err
 	}
 
-	srv := server.New(logger, "127.0.0.1:8200", client)
+	ln, err := net.Listen("tcp", "127.0.0.1:8200")
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
+	}
+	srv := server.New(logger, client)
 	go func() {
 		logger.Println("Starting HTTP server...")
-		err = srv.ListenAndServe()
+		err = srv.Serve(ln)
 		if err != http.ErrServerClosed {
 			// Error starting or closing listener:
 			logger.Printf("HTTP server ListenAndServe: %s\n", err)
 		}
 		threadFinishedCh <- struct{}{}
 	}()
-
-	// Check the HTTP server is up and running before continuing.
-	// Wait up to ~2s total.
-	for wait := time.Millisecond; ; wait = wait * 2 {
-		resp, err := http.Get("http://127.0.0.1:8200/_health")
-		if err == nil && resp != nil && resp.StatusCode == 200 {
-			break
-		}
-		if wait >= 2*time.Second {
-			const errString = "HTTP server did not come up within 2s"
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", errString, err)
-			}
-			if resp != nil {
-				return nil, fmt.Errorf("%s: %d", errString, resp.StatusCode)
-			}
-			return nil, errors.New(errString)
-		}
-		time.Sleep(wait)
-	}
 
 	logger.Println("Initialised")
 
@@ -134,13 +118,13 @@ func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*h
 func writePreconfiguredSecrets(client *api.Client) error {
 	configuredSecrets, err := config.ParseConfiguredSecrets()
 	if err != nil {
-		return fmt.Errorf("Failed to parse configured secrets to read: %s", err)
+		return fmt.Errorf("failed to parse configured secrets to read: %s", err)
 	}
 
 	if _, err := os.Stat(config.DefaultSecretDirectory); os.IsNotExist(err) {
 		err = os.MkdirAll(config.DefaultSecretDirectory, 0755)
 		if err != nil {
-			return fmt.Errorf("Failed to create directory %s: %s", config.DefaultSecretDirectory, err)
+			return fmt.Errorf("failed to create directory %s: %s", config.DefaultSecretDirectory, err)
 		}
 	}
 
@@ -164,7 +148,7 @@ func writePreconfiguredSecrets(client *api.Client) error {
 		if _, err = os.Stat(dir); os.IsNotExist(err) {
 			err = os.MkdirAll(dir, 0755)
 			if err != nil {
-				return fmt.Errorf("Failed to create directory %q for secret %s: %s", dir, s.Name(), err)
+				return fmt.Errorf("failed to create directory %q for secret %s: %s", dir, s.Name(), err)
 			}
 		}
 		err = ioutil.WriteFile(s.FilePath, content, 0644)

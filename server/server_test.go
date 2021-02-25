@@ -31,17 +31,17 @@ func TestProxy(t *testing.T) {
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	proxy := New(log.New(ioutil.Discard, "[proxy server] ", 0), ln.Addr().String(), cl)
+	proxy := New(log.New(ioutil.Discard, "[proxy server] ", 0), cl)
 	go func() {
 		_ = proxy.Serve(ln)
 	}()
 
 	proxyClient, err := api.NewClient(&api.Config{
-		Address: "http://" + proxy.Addr,
+		Address: "http://" + ln.Addr().String(),
 	})
 
 	t.Run("_health endpoint works", func(t *testing.T) {
-		resp, err := http.Get(fmt.Sprintf("http://%s/_health", proxy.Addr))
+		resp, err := http.Get(fmt.Sprintf("http://%s/_health", ln.Addr().String()))
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 	})
@@ -54,7 +54,7 @@ func TestProxy(t *testing.T) {
 				},
 			},
 		}
-		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", proxy.Addr))
+		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", ln.Addr().String()))
 		require.NoError(t, err)
 		if resp.StatusCode != 200 {
 			body, err := ioutil.ReadAll(resp.Body)
