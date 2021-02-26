@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -43,35 +41,45 @@ func HandleRequest(ctx context.Context, payload Payload) error {
 		return fmt.Errorf("error reading file: %w", err)
 	}
 
-	// read token
-	_, err = ioutil.ReadFile("/tmp/vault/token")
-	if err != nil {
-		return fmt.Errorf("error reading file: %w", err)
-	}
-
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		return errors.New("no DATABASE_URL, exiting")
-	}
-
-	// First decode the JSON into a map[string]interface{}
 	var secret api.Secret
-	b := bytes.NewBuffer(secretRaw)
-	dec := json.NewDecoder(b)
-	// While decoding JSON values, interpret the integer values as `json.Number`s
-	// instead of `float64`.
-	dec.UseNumber()
-
-	if err := dec.Decode(&secret); err != nil {
+	err = json.Unmarshal(secretRaw, &secret)
+	if err != nil {
 		return err
 	}
 
-	// read users from database
-	connStr := fmt.Sprintf("postgres://%s:%s@%s/lambdadb?sslmode=disable", secret.Data["username"], secret.Data["password"], dbURL)
+	logger.Println("Querying users using credentials from disk")
+	err = readUsersFromDatabase(ctx, logger, &secret)
+	if err != nil {
+		return err
+	}
+
+	proxyClient, err := api.NewClient(&api.Config{
+		Address: "http://127.0.0.1:8200",
+	})
+	if err != nil {
+		return err
+	}
+	proxySecret, err := proxyClient.Logical().Read(os.Getenv("VAULT_SECRET_PATH_DB"))
+	if err != nil {
+		return err
+	}
+
+	logger.Println("Querying users using credentials from proxy")
+	err = readUsersFromDatabase(ctx, logger, proxySecret)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func readUsersFromDatabase(ctx context.Context, logger *log.Logger, secret *api.Secret) error {
+	connStr := fmt.Sprintf("postgres://%s:%s@%s/lambdadb?sslmode=disable", secret.Data["username"], secret.Data["password"], os.Getenv("DATABASE_URL"))
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
 	var users []string
 	rows, err := db.QueryContext(ctx, "SELECT usename FROM pg_catalog.pg_user")
