@@ -121,18 +121,6 @@ func writePreconfiguredSecrets(client *api.Client) error {
 		return fmt.Errorf("failed to parse configured secrets to read: %w", err)
 	}
 
-	if _, err := os.Stat(config.DefaultSecretDirectory); os.IsNotExist(err) {
-		err = os.MkdirAll(config.DefaultSecretDirectory, 0755)
-		if err != nil {
-			return fmt.Errorf("failed to create directory %s: %s", config.DefaultSecretDirectory, err)
-		}
-	}
-
-	err = ioutil.WriteFile(path.Join(config.DefaultSecretDirectory, "token"), []byte(client.Token()), 0644)
-	if err != nil {
-		return err
-	}
-
 	for _, s := range configuredSecrets {
 		// Will block until shutdown event is received or cancelled via the context.
 		secret, err := client.Logical().Read(s.VaultPath)
