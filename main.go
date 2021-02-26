@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"sync"
 	"syscall"
 
 	"github.com/hashicorp/vault-lambda-extension/config"
@@ -34,14 +35,16 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	threadFinishedCh := make(chan struct{}, 2)
-	srv, err := initialiseExtension(logger, threadFinishedCh)
+	var wg sync.WaitGroup
+	srv, err := runExtension(logger, &wg)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
 	shutdownChannel := make(chan struct{})
 	go func() {
+		wg.Add(1)
+		defer wg.Done()
 		interruptChannel := make(chan os.Signal, 1)
 		signal.Notify(interruptChannel, syscall.SIGTERM, syscall.SIGINT)
 		select {
@@ -56,7 +59,6 @@ func main() {
 			// Error from closing listeners, or context timeout:
 			logger.Printf("HTTP server shutdown error: %s\n", err)
 		}
-		threadFinishedCh <- struct{}{}
 	}()
 
 	processEvents(ctx, logger, extensionClient)
@@ -65,13 +67,11 @@ func main() {
 	shutdownChannel <- struct{}{}
 
 	// Ensure we wait for the HTTP server to gracefully shut down.
-	// One signal from the HTTP server thread and one from the shutdown thread.
-	<-threadFinishedCh
-	<-threadFinishedCh
+	wg.Wait()
 	logger.Println("Graceful shutdown complete")
 }
 
-func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*http.Server, error) {
+func runExtension(logger *log.Logger, wg *sync.WaitGroup) (*http.Server, error) {
 	logger.Println("Initialising")
 
 	vaultAddr := os.Getenv(api.EnvVaultAddress)
@@ -101,13 +101,13 @@ func initialiseExtension(logger *log.Logger, threadFinishedCh chan struct{}) (*h
 	}
 	srv := server.New(logger, config, client.Token())
 	go func() {
-		logger.Println("Starting HTTP server...")
+		wg.Add(1)
+		defer wg.Done()
+		logger.Println("Starting HTTP server")
 		err = srv.Serve(ln)
 		if err != http.ErrServerClosed {
-			// Error starting or closing listener:
-			logger.Printf("HTTP server ListenAndServe: %s\n", err)
+			logger.Printf("HTTP server shutdown unexpectedly: %s\n", err)
 		}
-		threadFinishedCh <- struct{}{}
 	}()
 
 	logger.Println("Initialised")
