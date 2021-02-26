@@ -42,8 +42,8 @@ func main() {
 	}
 
 	shutdownChannel := make(chan struct{})
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		interruptChannel := make(chan os.Signal, 1)
 		signal.Notify(interruptChannel, syscall.SIGTERM, syscall.SIGINT)
@@ -100,8 +100,8 @@ func runExtension(logger *log.Logger, wg *sync.WaitGroup) (*http.Server, error) 
 		return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
 	}
 	srv := server.New(logger, config, client.Token())
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		logger.Println("Starting HTTP server")
 		err = srv.Serve(ln)
