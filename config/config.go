@@ -135,10 +135,6 @@ func ParseConfiguredSecrets() ([]ConfiguredSecret, error) {
 		result = append(result, *secret)
 	}
 
-	if len(result) == 0 {
-		resultErr = multierror.Append(resultErr, fmt.Errorf("no valid secrets to read configured"))
-	}
-
 	return result, resultErr
 }
 

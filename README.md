@@ -1,10 +1,9 @@
 # vault-lambda-extension
 
 This repository contains the source code for HashiCorp's Vault AWS Lambda extension.
-The extension utilizes the AWS Lambda Extensions API to read secrets from your
-Vault deployment and write the result to disk before the Lambda function itself
-starts to execute. To use it, include the following ARN as a layer in your
-Lambda function:
+The extension utilizes the AWS Lambda Extensions API to help your Lambda function
+read secrets from your Vault deployment. To use it, include the following ARN as a
+layer in your Lambda function:
 
 ```text
 arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:7
@@ -16,8 +15,14 @@ Where region may be any of `ap-northeast-1`, `ap-northeast-2`, `ap-south-1`,
 `us-west-1`, `us-west-2`.
 
 The extension authenticates with Vault using [AWS IAM auth][vault-aws-iam-auth],
-and writes the result as JSON to disk. It also writes a vault token to
-`/tmp/vault/token`. All configuration is supplied via environment variables.
+and all configuration is supplied via environment variables. There are two methods
+to read secrets, which can both be used side-by-side:
+
+* Configure environment variables such as `VAULT_SECRET_PATH` for the extension
+  to read a secret and write it to disk.
+* Make unauthenticated requests to the extension's local server at
+  `http://127.0.0.1:8200`, which will add an authentication header and proxy to
+  the configured `VAULT_ADDR`.
 
 ## Getting Started
 
@@ -72,18 +77,23 @@ material from `/tmp/vault/secret.json`. The exact contents of the JSON object
 will depend on the secret read, but its schema is the [Secret struct][vault-api-secret-struct]
 from the Vault API module.
 
+Alternatively, you can send normal Vault API requests over HTTP to the local
+proxy at `http://127.0.0.1:8200`, and the extension will add authentication
+before forwarding the request. Vault responses will be returned unmodified.
+
 ## Configuration
 
 The extension is configured via [Lambda environment variables][lambda-env-vars].
 Most of the [Vault CLI client's environment variables][vault-env-vars] are available,
 as well as some additional variables to configure auth, which secret(s) to read and
-where to write secrets. At least one valid secret to read must be specified.
+where to write secrets.
 
 Environment variable    | Description | Required | Example value
 ------------------------|-------------|----------|--------------
 `VAULT_ADDR`            | Vault address to connect to | Yes | `https://x.x.x.x:8200`
 `VAULT_AUTH_PROVIDER`   | Name of the configured AWS IAM auth route on Vault | Yes | `aws`
 `VAULT_AUTH_ROLE`       | Vault role to authenticate as | Yes | `lambda-app`
+`VAULT_IAM_SERVER_ID`   | Value to pass to the Vault server via the [`X-Vault-AWS-IAM-Server-ID` HTTP Header for AWS Authentication](https://www.vaultproject.io/api-docs/auth/aws#iam_server_id_header_value) | No | `vault.example.com`
 `VAULT_SECRET_PATH`     | Secret path to read, written to `/tmp/vault/secret.json` unless `VAULT_SECRET_FILE` is specified | No | `database/creds/lambda-app`
 `VAULT_SECRET_FILE`     | Path to write the JSON response for `VAULT_SECRET_PATH` | No | `/tmp/db.json`
 `VAULT_SECRET_PATH_FOO` | Additional secret path to read, where FOO can be any name, as long as a matching `VAULT_SECRET_FILE_FOO` is specified | No | `secret/lambda-app/token`
@@ -100,15 +110,12 @@ Environment variable    | Description | Required | Example value
 `VAULT_CAPATH`          | Path to a _directory_ of PEM-encoded CA certificate files on the local disk | No | `/tmp/certs`
 `VAULT_CLIENT_CERT`     | Path to a PEM-encoded client certificate on the local disk | No | `/tmp/client.crt`
 `VAULT_CLIENT_KEY`      | Path to an unencrypted, PEM-encoded private key on disk which corresponds to the matching client certificate | No | `/tmp/client.key`
-`VAULT_CLIENT_TIMEOUT`  | Timeout for Vault requests. Default value is 60s. **Any value over 10s will exceed the Extensions API timeout and therefore have no effect** | No | `5s`
-`VAULT_IAM_SERVER_ID`   | Value to pass to the Vault server via the [`X-Vault-AWS-IAM-Server-ID` HTTP Header for AWS Authentication](https://www.vaultproject.io/api-docs/auth/aws#iam_server_id_header_value) | No | `vault.example.com`
-`VAULT_MAX_RETRIES`     | Maximum number of retries on `5xx` error codes. Defaults to 2 | No | `2`
+`VAULT_CLIENT_TIMEOUT`  | Timeout for Vault requests. Default value is 60s. Ignored by proxy server. **Any value over 10s will exceed the Extensions API timeout and therefore have no effect** | No | `5s`
+`VAULT_MAX_RETRIES`     | Maximum number of retries on `5xx` error codes. Defaults to 2. Ignored by proxy server | No | `2`
 `VAULT_SKIP_VERIFY`     | Do not verify Vault's presented certificate before communicating with it. Setting this variable is not recommended and voids Vault's [security model][vault-security-model]  | No | `true`
 `VAULT_TLS_SERVER_NAME` | Name to use as the SNI host when connecting via TLS | No | `vault.example.com`
-`VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details | No | `10`
-`VAULT_NAMESPACE`       | The namespace to use for the command | No | `education`
-`VAULT_SRV_LOOKUP`      | The Vault client will lookup DNS SRV records for the host. See [Vault Commands (CLI)][vault-env-vars] documentation for details | No | `true`
-`VAULT_MFA`             | MFA credentials. See [Vault Commands (CLI)][vault-env-vars] documentation for details | No | `true`
+`VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details. Ignored by proxy server | No | `10`
+`VAULT_NAMESPACE`       | The namespace to use for pre-configured secrets. Ignored by proxy server | No | `education`
 
 ## Limitations
 
