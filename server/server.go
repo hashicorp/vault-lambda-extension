@@ -12,7 +12,7 @@ import (
 )
 
 // New returns an unstarted HTTP server with health and proxy handlers.
-func New(logger *log.Logger, config *api.Config, token string) *http.Server {
+func New(logger *log.Logger, config *api.Config, token func() string) *http.Server {
 	mux := http.ServeMux{}
 	mux.HandleFunc("/", proxyHandler(logger, config, token))
 	srv := http.Server{
@@ -24,10 +24,10 @@ func New(logger *log.Logger, config *api.Config, token string) *http.Server {
 
 // The proxyHandler borrows from the Send function in Vault Agent's proxy:
 // https://github.com/hashicorp/vault/blob/22b486b651b8956d32fb24e77cef4050df7094b6/command/agent/cache/api_proxy.go
-func proxyHandler(logger *log.Logger, config *api.Config, token string) func(http.ResponseWriter, *http.Request) {
+func proxyHandler(logger *log.Logger, config *api.Config, token func() string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger.Printf("Proxying %s %s\n", r.Method, r.URL.Path)
-		fwReq, err := proxyRequest(r, config.Address, token)
+		fwReq, err := proxyRequest(r, config.Address, token())
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to generate proxy request: %s", err), http.StatusInternalServerError)
 			return

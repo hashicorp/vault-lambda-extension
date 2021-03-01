@@ -47,7 +47,9 @@ var (
 
 func TestProxy(t *testing.T) {
 	vault := fakeVault()
-	proxyAddr := startProxy(t, vault.URL)
+	defer vault.Close()
+	proxyAddr, close := startProxy(t, vault.URL)
+	defer close()
 
 	t.Run("happy path bare http client", func(t *testing.T) {
 		fakeVaultResponse = vaultResponseFooBar
@@ -87,7 +89,8 @@ func TestProxy(t *testing.T) {
 
 	t.Run("failed upstream request should give 502", func(t *testing.T) {
 		// Set an invalid vault address scheme so that the HTTP request to vault fails.
-		brokenProxyAddr := startProxy(t, strings.ReplaceAll(vault.URL, "http://", "https://"))
+		brokenProxyAddr, close := startProxy(t, strings.ReplaceAll(vault.URL, "http://", "https://"))
+		defer close()
 		fakeVaultResponse = vaultResponseFooBar
 		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", brokenProxyAddr))
 		require.NoError(t, err)
@@ -96,7 +99,8 @@ func TestProxy(t *testing.T) {
 
 	t.Run("failure to generate proxy request should give 500", func(t *testing.T) {
 		// Set an invalid vault address so that generating a proxy request fails.
-		brokenProxyAddr := startProxy(t, "@:::")
+		brokenProxyAddr, close := startProxy(t, "@:::")
+		defer close()
 		fakeVaultResponse = vaultResponseFooBar
 		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", brokenProxyAddr))
 		require.NoError(t, err)
@@ -104,18 +108,21 @@ func TestProxy(t *testing.T) {
 	})
 }
 
-func startProxy(t *testing.T, vaultAddress string) string {
+func startProxy(t *testing.T, vaultAddress string) (string, func() error) {
 	config := api.DefaultConfig()
 	require.NoError(t, config.Error)
 	config.Address = vaultAddress
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	proxy := New(log.New(ioutil.Discard, "", 0), config, "")
+	tokenFunc := func() string {
+		return ""
+	}
+	proxy := New(log.New(ioutil.Discard, "", 0), config, tokenFunc)
 	go func() {
 		_ = proxy.Serve(ln)
 	}()
 
-	return ln.Addr().String()
+	return ln.Addr().String(), proxy.Close
 }
 
 func fakeVault() *httptest.Server {
