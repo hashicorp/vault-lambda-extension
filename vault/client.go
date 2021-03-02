@@ -108,7 +108,10 @@ func refreshToken(ctx context.Context, logger *log.Logger, stsSvc *sts.STS, clie
 		if err != nil {
 			logger.Printf("renewer stopped: %s\n", err)
 		} else {
-			logger.Println("renewer finished after reaching maximum lease")
+			// This could be because:
+			// * The maximum TTL expired.
+			// * The context was cancelled due to shutdown.
+			logger.Println("renewer finished")
 		}
 
 		select {
