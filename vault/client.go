@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -14,6 +15,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/hashicorp/vault-lambda-extension/config"
 	"github.com/hashicorp/vault/api"
+)
+
+const (
+	tokenExpiryGracePeriodEnv     = "VAULT_TOKEN_EXPIRY_GRACE_PERIOD"
+	defaultTokenExpiryGracePeriod = 10 * time.Second
 )
 
 // Client holds api.Client and handles state required to renew tokens and re-auth as required.
@@ -28,9 +34,10 @@ type Client struct {
 	authConfig config.AuthConfig
 
 	// Token refresh/renew data.
-	tokenExpiry    time.Time
-	tokenTTL       time.Duration
-	tokenRenewable bool
+	tokenExpiryGracePeriod time.Duration
+	tokenExpiry            time.Time
+	tokenTTL               time.Duration
+	tokenRenewable         bool
 }
 
 // NewClient uses the AWS IAM auth method configured in a Vault cluster to
@@ -44,6 +51,11 @@ func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.Au
 	ses := session.Must(session.NewSession())
 	stsSvc := sts.New(ses)
 
+	expiryGracePeriod, err := parseTokenExpiryGracePeriod()
+	if err != nil {
+		return nil, err
+	}
+
 	client := &Client{
 		VaultClient: vaultClient,
 		VaultConfig: vaultConfig,
@@ -51,6 +63,8 @@ func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.Au
 		logger:     logger,
 		stsSvc:     stsSvc,
 		authConfig: authConfig,
+
+		tokenExpiryGracePeriod: expiryGracePeriod,
 	}
 
 	return client, nil
@@ -124,12 +138,7 @@ func (c *Client) login(ctx context.Context) error {
 	}
 	c.VaultClient.SetToken(token)
 
-	err = c.updateTokenMetadata(secret)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.updateTokenMetadata(secret)
 }
 
 func (c *Client) renew() error {
@@ -157,11 +166,26 @@ func (c *Client) updateTokenMetadata(secret *api.Secret) error {
 
 // Returns true if current time is after tokenExpiry, or within 10s.
 func (c *Client) expired() bool {
-	return time.Now().Add(10 * time.Second).After(c.tokenExpiry)
+	return time.Now().Add(c.tokenExpiryGracePeriod).After(c.tokenExpiry)
 }
 
 // Returns true if tokenExpiry time is in less than 20% of tokenTTL.
 func (c *Client) shouldRenew() bool {
 	remaining := c.tokenExpiry.Sub(time.Now())
 	return c.tokenRenewable && remaining.Nanoseconds() < c.tokenTTL.Nanoseconds()/5
+}
+
+func parseTokenExpiryGracePeriod() (time.Duration, error) {
+	var err error
+	expiryGracePeriod := defaultTokenExpiryGracePeriod
+
+	expiryGracePeriodString := os.Getenv(tokenExpiryGracePeriodEnv)
+	if expiryGracePeriodString != "" {
+		expiryGracePeriod, err = time.ParseDuration(expiryGracePeriodString)
+		if err != nil {
+			return 0, fmt.Errorf("unable to parse %q environment variable as a valid duration: %w", tokenExpiryGracePeriodEnv, err)
+		}
+	}
+
+	return expiryGracePeriod, nil
 }

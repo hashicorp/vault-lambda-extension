@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -33,14 +34,9 @@ var (
 	}
 	with10hLease = &api.Secret{
 		Auth: &api.SecretAuth{
-			LeaseDuration: 1,
+			LeaseDuration: 36000,
 			ClientToken:   "foo-10h-token",
 			Renewable:     true,
-		},
-	}
-	nonRenewable = &api.Secret{
-		Auth: &api.SecretAuth{
-			Renewable: false,
 		},
 	}
 )
@@ -155,6 +151,9 @@ func TestTokenRenewal(t *testing.T) {
 		require.Equal(t, t.Name(), token)
 		require.Equal(t, 1, len(vaultRequests))
 		require.Equal(t, "/v1/auth/token/renew-self", vaultRequests[0].URL.Path)
+
+		// Token expiry should now be in another 10 hours
+		require.True(t, c.tokenExpiry.After(time.Now().Add(9*time.Hour)))
 	})
 
 	t.Run("TestToken_MakesRenewCallAt90%TTL_ErrorIsLoggedInsteadOfReturned", func(t *testing.T) {
@@ -208,6 +207,28 @@ func TestTokenRenewal(t *testing.T) {
 		require.Equal(t, t.Name(), token)
 		require.Equal(t, 0, len(vaultRequests))
 	})
+}
+
+func TestParseTokenExpiryGracePeriod(t *testing.T) {
+	for _, tc := range []struct {
+		duration string
+		expected time.Duration
+	}{
+		{"", 10 * time.Second},
+		{"10000000000ns", 10 * time.Second},
+		{"1ns", time.Nanosecond},
+		{"2h", 2 * time.Hour},
+	} {
+		require.NoError(t, os.Setenv(tokenExpiryGracePeriodEnv, tc.duration))
+		actual, err := parseTokenExpiryGracePeriod()
+		require.NoError(t, err)
+		require.Equal(t, tc.expected, actual)
+	}
+
+	// Error case.
+	require.NoError(t, os.Setenv(tokenExpiryGracePeriodEnv, "foo"))
+	_, err := parseTokenExpiryGracePeriod()
+	require.Error(t, err)
 }
 
 func fakeVault() *httptest.Server {
