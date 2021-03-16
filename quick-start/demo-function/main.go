@@ -29,11 +29,19 @@ func (m Payload) String() string {
 	return m.Message
 }
 
-// HandleRequest reads credentials from /tmp and uses them to query the database
+func handle(ctx context.Context, payload Payload) error {
+	logger := log.New(os.Stderr, fmt.Sprintf("[%s] ", functionName), 0)
+	err := handleRequest(ctx, payload, logger)
+	if err != nil {
+		logger.Println("Error handling request", err)
+	}
+	return err
+}
+
+// handleRequest reads credentials from /tmp and uses them to query the database
 // for users. The database is determined by the DATABASE_URL environment
 // variable, and the username and password are retrieved from the secret.
-func HandleRequest(ctx context.Context, payload Payload) error {
-	logger := log.New(os.Stderr, fmt.Sprintf("[%s] ", functionName), 0)
+func handleRequest(ctx context.Context, payload Payload, logger *log.Logger) error {
 	logger.Println("Received:", payload.String())
 	logger.Println("Reading file /tmp/vault_secret.json")
 	secretRaw, err := ioutil.ReadFile("/tmp/vault_secret.json")
@@ -50,7 +58,7 @@ func HandleRequest(ctx context.Context, payload Payload) error {
 	logger.Println("Querying users using credentials from disk")
 	err = readUsersFromDatabase(ctx, logger, &secret)
 	if err != nil {
-		return err
+		logger.Println("Failed to read users from database", err)
 	}
 
 	proxyClient, err := api.NewClient(&api.Config{
@@ -67,7 +75,7 @@ func HandleRequest(ctx context.Context, payload Payload) error {
 	logger.Println("Querying users using credentials from proxy")
 	err = readUsersFromDatabase(ctx, logger, proxySecret)
 	if err != nil {
-		return err
+		logger.Println("Failed to read users from database", err)
 	}
 
 	return nil
@@ -103,5 +111,5 @@ func readUsersFromDatabase(ctx context.Context, logger *log.Logger, secret *api.
 }
 
 func main() {
-	lambda.Start(HandleRequest)
+	lambda.Start(handle)
 }

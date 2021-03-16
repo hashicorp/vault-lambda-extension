@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -16,55 +16,91 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
+// Client holds api.Client and handles state required to renew tokens and re-auth as required.
+type Client struct {
+	mtx sync.Mutex
+
+	VaultClient *api.Client
+	VaultConfig *api.Config
+
+	logger     *log.Logger
+	stsSvc     *sts.STS
+	authConfig config.AuthConfig
+
+	// Token refresh/renew data.
+	tokenExpiry    time.Time
+	tokenTTL       time.Duration
+	tokenRenewable bool
+}
+
 // NewClient uses the AWS IAM auth method configured in a Vault cluster to
 // authenticate the execution role and create a Vault API client.
-func NewClient(ctx context.Context, logger *log.Logger, authConfig config.AuthConfig) (*api.Client, *api.Config, error) {
-	config := api.DefaultConfig()
-	if config.Error != nil {
-		return nil, nil, fmt.Errorf("error making default vault config for extension: %w", config.Error)
-	}
-	vaultClient, err := api.NewClient(config)
+func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.AuthConfig) (*Client, error) {
+	vaultClient, err := api.NewClient(vaultConfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error making extension: %w", err)
+		return nil, fmt.Errorf("error making extension: %w", err)
 	}
 
 	ses := session.Must(session.NewSession())
 	stsSvc := sts.New(ses)
 
-	logger.Println("attempting Vault login")
-	secret, err := login(ctx, stsSvc, vaultClient, authConfig)
-	if err != nil {
-		return nil, nil, err
+	client := &Client{
+		VaultClient: vaultClient,
+		VaultConfig: vaultConfig,
+
+		logger:     logger,
+		stsSvc:     stsSvc,
+		authConfig: authConfig,
 	}
 
-	// Start background threads to renew and re-auth as required.
-	go refreshToken(ctx, logger, stsSvc, vaultClient, authConfig, secret)
+	return client, nil
+}
 
-	return vaultClient, config, nil
+// Token synchronously renews/re-auths as required and returns a Vault token.
+func (c *Client) Token(ctx context.Context) (string, error) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	if c.expired() {
+		c.logger.Println("attempting to authenticate to Vault")
+		err := c.login(ctx)
+		if err != nil {
+			return "", err
+		}
+	} else if c.shouldRenew() {
+		// Renew but don't retry or bail on errors, just best effort.
+		c.logger.Println("attempting to renew Vault token")
+		err := c.renew()
+		if err != nil {
+			c.logger.Printf("failed to renew token but attempting to continue: %s\n", err)
+		}
+	}
+
+	return c.VaultClient.Token(), nil
 }
 
 // login authenticates to Vault using IAM auth, and sets the client's token.
-func login(ctx context.Context, stsSvc *sts.STS, client *api.Client, authConfig config.AuthConfig) (*api.Secret, error) {
+func (c *Client) login(ctx context.Context) error {
 	// ignore out
-	req, _ := stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
+	req, _ := c.stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
 	req.SetContext(ctx)
 
-	if authConfig.IAMServerID != "" {
-		req.HTTPRequest.Header.Add("X-Vault-AWS-IAM-Server-ID", authConfig.IAMServerID)
+	if c.authConfig.IAMServerID != "" {
+		req.HTTPRequest.Header.Add("X-Vault-AWS-IAM-Server-ID", c.authConfig.IAMServerID)
 	}
 
 	if signErr := req.Sign(); signErr != nil {
-		return nil, signErr
+		return signErr
 	}
 
 	headers, err := json.Marshal(req.HTTPRequest.Header)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	body, err := ioutil.ReadAll(req.HTTPRequest.Body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	d := make(map[string]interface{})
@@ -72,136 +108,60 @@ func login(ctx context.Context, stsSvc *sts.STS, client *api.Client, authConfig 
 	d["iam_request_url"] = base64.StdEncoding.EncodeToString([]byte(req.HTTPRequest.URL.String()))
 	d["iam_request_headers"] = base64.StdEncoding.EncodeToString(headers)
 	d["iam_request_body"] = base64.StdEncoding.EncodeToString(body)
-	d["role"] = authConfig.Role
+	d["role"] = c.authConfig.Role
 
-	secret, err := client.Logical().Write(fmt.Sprintf("auth/%s/login", authConfig.Provider), d)
+	secret, err := c.VaultClient.Logical().Write(fmt.Sprintf("auth/%s/login", c.authConfig.Provider), d)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if secret == nil {
-		return nil, fmt.Errorf("got no response from the %s authentication provider", authConfig.Provider)
+		return fmt.Errorf("got no response from the %s authentication provider", c.authConfig.Provider)
 	}
 
 	token, err := secret.TokenID()
 	if err != nil {
-		return nil, fmt.Errorf("error reading token: %s", err)
+		return fmt.Errorf("error reading token: %s", err)
 	}
-	client.SetToken(token)
+	c.VaultClient.SetToken(token)
 
-	return secret, nil
-}
-
-// refreshToken will handle renewing the existing token until it reaches its maximum
-// lease and will continue re-authenticating and renewing until the context is cancelled.
-// Should be called immediately after a token is received.
-func refreshToken(ctx context.Context, logger *log.Logger, stsSvc *sts.STS, client *api.Client, config config.AuthConfig, secret *api.Secret) {
-	for {
-		// Sleep for the first 2/3 of the initial token TTL, as the renewer below
-		// will immediately start with a renew call, and in many cases we expect
-		// the Lambda function will exit before the first renewal is even needed.
-		err := sleepUntilRenewingShouldStart(ctx, secret)
-		if err != nil {
-			logger.Printf("error while waiting for first token renewal: %s\n", err)
-		}
-
-		err = renewToken(ctx, logger, client, secret)
-		if err != nil {
-			logger.Printf("renewer stopped: %s\n", err)
-		} else {
-			// This could be because:
-			// * The maximum TTL expired.
-			// * The context was cancelled due to shutdown.
-			logger.Println("renewer finished")
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		sleepDuration := 100 * time.Millisecond
-		for {
-			logger.Println("attempting to re-authenticate to Vault")
-			secret, err = login(ctx, stsSvc, client, config)
-			if err != nil {
-				logger.Printf("failed login: %s\n", err)
-			} else {
-				break
-			}
-
-			logger.Printf("backing off re-auth for %v\n", sleepDuration)
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(sleepDuration):
-			}
-
-			sleepDuration = calculateBackoff(sleepDuration, 5*time.Minute)
-		}
-	}
-}
-
-func sleepUntilRenewingShouldStart(ctx context.Context, secret *api.Secret) error {
-	ttl, err := secret.TokenTTL()
+	err = c.updateTokenMetadata(secret)
 	if err != nil {
 		return err
-	}
-	initialSleepDuration := time.Duration(float64(ttl.Nanoseconds()) * 0.67)
-	select {
-	case <-ctx.Done():
-		return nil
-	case <-time.After(initialSleepDuration):
 	}
 
 	return nil
 }
 
-// renewToken will renew a token for as long as it can and then return.
-// Returned error will be nil if the token ran to its maximum lease,
-// or if the context/rewewal was cancelled, and non-nil otherwise.
-func renewToken(ctx context.Context, logger *log.Logger, client *api.Client, secret *api.Secret) error {
-	select {
-	case <-ctx.Done():
-		return nil
-	default:
-	}
-
-	increment, err := secret.TokenTTL()
+func (c *Client) renew() error {
+	secret, err := c.VaultClient.Auth().Token().RenewSelf(int(c.tokenTTL.Seconds()))
 	if err != nil {
 		return err
 	}
-	renewer, err := client.NewRenewer(&api.RenewerInput{
-		Secret:    secret,
-		Increment: int(increment.Seconds()),
-	})
-	go renewer.Renew()
-	defer renewer.Stop()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case err := <-renewer.DoneCh():
-			return err
-
-		case <-renewer.RenewCh():
-			logger.Println("successfully renewed token")
-		}
-	}
+	return c.updateTokenMetadata(secret)
 }
 
-// calculateBackoff determines a new backoff duration that is roughly twice
-// the previous value, capped to a max value, with a measure of randomness.
-// Copied directly from vault agent:
-// https://github.com/hashicorp/vault/blob/8db00401a44a6448d3622c97a8f1676405153deb/command/agent/auth/auth.go#L329-L340
-func calculateBackoff(previous, max time.Duration) time.Duration {
-	maxBackoff := 2 * previous
-	if maxBackoff > max {
-		maxBackoff = max
+// Stores metadata about token lease that informs when to re-auth or renew.
+func (c *Client) updateTokenMetadata(secret *api.Secret) error {
+	var err error
+	c.tokenTTL, err = secret.TokenTTL()
+	if err != nil {
+		return err
 	}
 
-	// Trim a random amount (0-25%) off the doubled duration
-	trim := rand.Int63n(int64(maxBackoff) / 4)
-	return maxBackoff - time.Duration(trim)
+	c.tokenExpiry = time.Now().Add(c.tokenTTL)
+	c.tokenRenewable = secret.Renewable
+
+	return nil
+}
+
+// Returns true if current time is after tokenExpiry, or within 10s.
+func (c *Client) expired() bool {
+	return time.Now().Add(10 * time.Second).After(c.tokenExpiry)
+}
+
+// Returns true if tokenExpiry time is in less than 20% of tokenTTL.
+func (c *Client) shouldRenew() bool {
+	remaining := c.tokenExpiry.Sub(time.Now())
+	return c.tokenRenewable && remaining.Nanoseconds() < c.tokenTTL.Nanoseconds()/5
 }

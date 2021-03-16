@@ -81,14 +81,23 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 		return nil, errors.New("missing VAULT_ADDR, VAULT_AUTH_PROVIDER or VAULT_AUTH_ROLE environment variables")
 	}
 
-	client, config, err := vault.NewClient(ctx, logger, authConfig)
+	vaultConfig := api.DefaultConfig()
+	if vaultConfig.Error != nil {
+		return nil, fmt.Errorf("error making default vault config for extension: %w", vaultConfig.Error)
+	}
+	client, err := vault.NewClient(logger, vaultConfig, authConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
 		return nil, fmt.Errorf("nil client returned: %w", err)
 	}
 
-	err = writePreconfiguredSecrets(client)
+	_, err = client.Token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error logging in to Vault: %w", err)
+	}
+
+	err = writePreconfiguredSecrets(client.VaultClient)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +106,7 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
 	}
-	srv := server.New(logger, config, client.Token)
+	srv := server.New(logger, client)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

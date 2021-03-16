@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/hashicorp/vault/api"
+	"github.com/hashicorp/vault-lambda-extension/vault"
 	"github.com/hashicorp/vault/sdk/helper/consts"
 )
 
 // New returns an unstarted HTTP server with health and proxy handlers.
-func New(logger *log.Logger, config *api.Config, token func() string) *http.Server {
+func New(logger *log.Logger, client *vault.Client) *http.Server {
 	mux := http.ServeMux{}
-	mux.HandleFunc("/", proxyHandler(logger, config, token))
+	mux.HandleFunc("/", proxyHandler(logger, client))
 	srv := http.Server{
 		Handler: &mux,
 	}
@@ -24,16 +24,22 @@ func New(logger *log.Logger, config *api.Config, token func() string) *http.Serv
 
 // The proxyHandler borrows from the Send function in Vault Agent's proxy:
 // https://github.com/hashicorp/vault/blob/22b486b651b8956d32fb24e77cef4050df7094b6/command/agent/cache/api_proxy.go
-func proxyHandler(logger *log.Logger, config *api.Config, token func() string) func(http.ResponseWriter, *http.Request) {
+func proxyHandler(logger *log.Logger, client *vault.Client) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		token, err := client.Token(r.Context())
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to get valid Vault token: %s", err), http.StatusInternalServerError)
+			return
+		}
+
 		logger.Printf("Proxying %s %s\n", r.Method, r.URL.Path)
-		fwReq, err := proxyRequest(r, config.Address, token())
+		fwReq, err := proxyRequest(r, client.VaultConfig.Address, token)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to generate proxy request: %s", err), http.StatusInternalServerError)
 			return
 		}
 
-		resp, err := config.HttpClient.Do(fwReq)
+		resp, err := client.VaultConfig.HttpClient.Do(fwReq)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to proxy request: %s", err), http.StatusBadGateway)
 			return

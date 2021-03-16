@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/vault-lambda-extension/config"
+	"github.com/hashicorp/vault-lambda-extension/vault"
 	"github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
 )
@@ -43,6 +45,13 @@ var (
 		err:  errors.New("bad gateway"),
 		code: http.StatusBadGateway,
 	}
+	vaultLoginResponse = &api.Secret{
+		Auth: &api.SecretAuth{
+			LeaseDuration: 3600,
+			ClientToken:   "foo",
+			Renewable:     true,
+		},
+	}
 )
 
 func TestProxy(t *testing.T) {
@@ -54,12 +63,9 @@ func TestProxy(t *testing.T) {
 	t.Run("happy path bare http client", func(t *testing.T) {
 		fakeVaultResponse = vaultResponseFooBar
 		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", proxyAddr))
+
 		require.NoError(t, err)
-		if resp.StatusCode != 200 {
-			body, err := ioutil.ReadAll(resp.Body)
-			require.NoError(t, err)
-			t.Fatal("Non-200 status code from proxy", string(body))
-		}
+		require.Equal(t, http.StatusOK, resp.StatusCode)
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		require.NoError(t, err)
@@ -88,36 +94,23 @@ func TestProxy(t *testing.T) {
 	})
 
 	t.Run("failed upstream request should give 502", func(t *testing.T) {
-		// Set an invalid vault address scheme so that the HTTP request to vault fails.
-		brokenProxyAddr, close := startProxy(t, strings.ReplaceAll(vault.URL, "http://", "https://"))
-		defer close()
 		fakeVaultResponse = vaultResponseFooBar
-		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", brokenProxyAddr))
+		resp, err := http.Get(fmt.Sprintf("http://%s/FailedTransport", proxyAddr))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusBadGateway, resp.StatusCode)
-	})
-
-	t.Run("failure to generate proxy request should give 500", func(t *testing.T) {
-		// Set an invalid vault address so that generating a proxy request fails.
-		brokenProxyAddr, close := startProxy(t, "@:::")
-		defer close()
-		fakeVaultResponse = vaultResponseFooBar
-		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", brokenProxyAddr))
-		require.NoError(t, err)
-		require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 	})
 }
 
 func startProxy(t *testing.T, vaultAddress string) (string, func() error) {
-	config := api.DefaultConfig()
-	require.NoError(t, config.Error)
-	config.Address = vaultAddress
+	vaultConfig := api.DefaultConfig()
+	require.NoError(t, vaultConfig.Error)
+	vaultConfig.Address = vaultAddress
+	client, err := vault.NewClient(log.New(ioutil.Discard, "", 0), vaultConfig, config.AuthConfig{})
+	require.NoError(t, err)
+	client.VaultConfig.Address = vaultAddress
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	tokenFunc := func() string {
-		return ""
-	}
-	proxy := New(log.New(ioutil.Discard, "", 0), config, tokenFunc)
+	proxy := New(log.New(ioutil.Discard, "", 0), client)
 	go func() {
 		_ = proxy.Serve(ln)
 	}()
@@ -128,19 +121,63 @@ func startProxy(t *testing.T, vaultAddress string) (string, func() error) {
 func fakeVault() *httptest.Server {
 	vaultResponsePtr := &fakeVaultResponse
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if vaultResponsePtr.err != nil {
+		switch {
+		case strings.Contains(r.URL.Path, "login"):
+			b, err := json.Marshal(vaultLoginResponse)
+			if err != nil {
+				http.Error(w, "failed to marshal test response", 500)
+				return
+			}
+			_, err = w.Write(b)
+			if err != nil {
+				http.Error(w, "failed to write response", 500)
+				return
+			}
+			w.WriteHeader(200)
+		case strings.Contains(r.URL.Path, "FailedTransport"):
+			err := hijack(w)
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+		case vaultResponsePtr.err != nil:
 			http.Error(w, vaultResponsePtr.err.Error(), vaultResponsePtr.code)
-			return
-		}
-		bytes, err := json.Marshal(vaultResponsePtr.secret)
-		if err != nil {
-			http.Error(w, "failed to marshal JSON", 500)
-			return
-		}
-		_, err = w.Write(bytes)
-		if err != nil {
-			http.Error(w, "failed to write response", 500)
-			return
+		default:
+			bytes, err := json.Marshal(vaultResponsePtr.secret)
+			if err != nil {
+				http.Error(w, "failed to marshal JSON", 500)
+				return
+			}
+			_, err = w.Write(bytes)
+			if err != nil {
+				http.Error(w, "failed to write response", 500)
+				return
+			}
 		}
 	}))
+}
+
+// hijack allows us to fail at the HTTP transport layer by writing an invalid
+// response. The proxy should return 502 when this happens.
+func hijack(w http.ResponseWriter) error {
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		return errors.New("failed to hijack")
+	}
+	conn, buf, err := hijacker.Hijack()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	_, err = buf.WriteString("Invalid HTTP response")
+	if err != nil {
+		return err
+	}
+	err = buf.Flush()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
