@@ -67,11 +67,83 @@ func TestTokenRenewal(t *testing.T) {
 		}))
 	stsSvc := sts.New(ses)
 
-	t.Run("TestExpiredByDefault", func(t *testing.T) {
-		vaultRequests = []*http.Request{}
-		c := Client{}
-		require.True(t, c.expired())
-		require.False(t, c.shouldRenew())
+	t.Run("TestExpired", func(t *testing.T) {
+		now := time.Now()
+		for _, tc := range []struct {
+			name        string
+			expiry      time.Time
+			gracePeriod time.Duration
+			expired     bool
+		}{
+			{
+				name:    "defaults to expired",
+				expired: true,
+			},
+			{
+				name:        "not expired",
+				expiry:      now.Add(time.Hour),
+				gracePeriod: (10 * time.Second),
+				expired:     false,
+			},
+			{
+				name:        "expired: falls inside grace period",
+				expiry:      now.Add(time.Hour),
+				gracePeriod: time.Hour,
+				expired:     true,
+			},
+			{
+				name:        "expired: expiry time in the past",
+				expiry:      now.Add(-time.Hour),
+				gracePeriod: time.Second,
+				expired:     true,
+			},
+		} {
+			c := Client{
+				tokenExpiry:            tc.expiry,
+				tokenExpiryGracePeriod: tc.gracePeriod,
+			}
+			require.Equal(t, tc.expired, c.expired())
+		}
+	})
+
+	t.Run("TestShouldRenew", func(t *testing.T) {
+		now := time.Now()
+		for _, tc := range []struct {
+			name      string
+			expiry    time.Time
+			ttl       time.Duration
+			renewable bool
+			expected  bool
+		}{
+			{
+				name:      "should renew",
+				expiry:    now.Add(time.Minute),
+				ttl:       time.Hour,
+				renewable: true,
+				expected:  true,
+			},
+			{
+				name:      "non-renewable token",
+				expiry:    now.Add(time.Minute),
+				ttl:       time.Hour,
+				renewable: false,
+				expected:  false,
+			},
+			{
+				name:      "lots of TTL still remaining",
+				expiry:    now.Add(time.Hour),
+				ttl:       time.Hour,
+				renewable: true,
+				expected:  false,
+			},
+		} {
+			c := Client{
+				tokenExpiry:    tc.expiry,
+				tokenTTL:       tc.ttl,
+				tokenRenewable: tc.renewable,
+			}
+			require.Equal(t, tc.expected, c.shouldRenew())
+		}
 	})
 
 	t.Run("TestToken_AlreadyLoggedIn_NoVaultCalls", func(t *testing.T) {
@@ -106,6 +178,9 @@ func TestTokenRenewal(t *testing.T) {
 		require.Equal(t, 1, len(vaultRequests))
 		require.Equal(t, "/v1/auth/aws/login", vaultRequests[0].URL.Path)
 		require.Equal(t, "foo-1h-token", token)
+		require.Equal(t, time.Hour, c.tokenTTL)
+		require.True(t, c.tokenRenewable)
+		require.True(t, c.tokenExpiry.After(time.Now().Add(55*time.Minute)))
 	})
 
 	t.Run("TestToken_MakesLoginCallIfExpired_PropagatesError", func(t *testing.T) {
@@ -154,6 +229,8 @@ func TestTokenRenewal(t *testing.T) {
 
 		// Token expiry should now be in another 10 hours
 		require.True(t, c.tokenExpiry.After(time.Now().Add(9*time.Hour)))
+		require.Equal(t, 10*time.Hour, c.tokenTTL)
+		require.True(t, c.tokenRenewable)
 	})
 
 	t.Run("TestToken_MakesRenewCallAt90%TTL_ErrorIsLoggedInsteadOfReturned", func(t *testing.T) {

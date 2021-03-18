@@ -16,6 +16,7 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_AUTH_PROVIDER=aws
       - VAULT_AUTH_ROLE=lambda-demo-function
+      - VAULT_TOKEN_EXPIRY_GRACE_PERIOD=100ms
       # Configuration for the AWS extension client
       - AWS_LAMBDA_RUNTIME_API=api
       # Auth for vault-lambda-extension

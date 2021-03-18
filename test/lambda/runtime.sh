@@ -19,8 +19,8 @@ EOF
     vault write auth/aws/role/lambda-demo-function \
         auth_type=iam \
         policies=test_policy \
-        token_ttl=2m \
-        token_max_ttl=5m \
+        token_ttl=10s \
+        token_max_ttl=15s \
         resolve_aws_unique_ids=false \
         bound_iam_principal_arn="${AWS_ROLE_ARN}"
     vault kv put secret/foo bar=baz
@@ -48,10 +48,20 @@ curl --silent --max-time 10 api:80/_sync/extension-initialised
 # Also ensure it continues to work beyond the original login token's TTL
 # and beyond the original token's max TTL.
 echo "Reading secret via proxy server"
-for i in `seq 20`; do
-    curl --silent -H "X-Vault-Request: true" http://127.0.0.1:8200/v1/secret/data/foo
-    sleep 10
+curl --silent -H "X-Vault-Request: true" http://127.0.0.1:8200/v1/secret/data/foo
+sleep 5
+
+# This loop spans a period where we should see a renewal and the end of the max token TTL.
+for i in `seq 15`; do
+    curl --silent -H "X-Vault-Request: true" http://127.0.0.1:8200/v1/secret/data/foo > /dev/null
+    sleep 1
 done
+
+# Ensure we got some log messages about renewing and having to re-auth
+{
+    cat /tmp/vault-lambda-extension.log | grep "authenticating to Vault"
+    cat /tmp/vault-lambda-extension.log | grep "renewing Vault token"
+} > /dev/null
 
 # Tell the API that we're ready for it to send the SHUTDOWN event to the extension.
 echo "Signalling shutdown to extension"

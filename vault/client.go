@@ -76,14 +76,14 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 	defer c.mtx.Unlock()
 
 	if c.expired() {
-		c.logger.Println("attempting to authenticate to Vault")
+		c.logger.Println("authenticating to Vault")
 		err := c.login(ctx)
 		if err != nil {
 			return "", err
 		}
 	} else if c.shouldRenew() {
 		// Renew but don't retry or bail on errors, just best effort.
-		c.logger.Println("attempting to renew Vault token")
+		c.logger.Println("renewing Vault token")
 		err := c.renew()
 		if err != nil {
 			c.logger.Printf("failed to renew token but attempting to continue: %s\n", err)
@@ -159,7 +159,10 @@ func (c *Client) updateTokenMetadata(secret *api.Secret) error {
 	}
 
 	c.tokenExpiry = time.Now().Add(c.tokenTTL)
-	c.tokenRenewable = secret.Renewable
+	c.tokenRenewable, err = secret.TokenIsRenewable()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
