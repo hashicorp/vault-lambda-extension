@@ -88,21 +88,22 @@ Most of the [Vault CLI client's environment variables][vault-env-vars] are avail
 as well as some additional variables to configure auth, which secret(s) to read and
 where to write secrets.
 
-Environment variable    | Description | Required | Example value
-------------------------|-------------|----------|--------------
-`VAULT_ADDR`            | Vault address to connect to | Yes | `https://x.x.x.x:8200`
-`VAULT_AUTH_PROVIDER`   | Name of the configured AWS IAM auth route on Vault | Yes | `aws`
-`VAULT_AUTH_ROLE`       | Vault role to authenticate as | Yes | `lambda-app`
-`VAULT_IAM_SERVER_ID`   | Value to pass to the Vault server via the [`X-Vault-AWS-IAM-Server-ID` HTTP Header for AWS Authentication](https://www.vaultproject.io/api-docs/auth/aws#iam_server_id_header_value) | No | `vault.example.com`
-`VAULT_SECRET_PATH`     | Secret path to read, written to `/tmp/vault/secret.json` unless `VAULT_SECRET_FILE` is specified | No | `database/creds/lambda-app`
-`VAULT_SECRET_FILE`     | Path to write the JSON response for `VAULT_SECRET_PATH` | No | `/tmp/db.json`
-`VAULT_SECRET_PATH_FOO` | Additional secret path to read, where FOO can be any name, as long as a matching `VAULT_SECRET_FILE_FOO` is specified | No | `secret/lambda-app/token`
-`VAULT_SECRET_FILE_FOO` | Must exist for any correspondingly named `VAULT_SECRET_PATH_FOO`. Name has no further effect beyond matching to the correct path variable | No | `/tmp/token`
+Environment variable              | Description | Required | Example value
+----------------------------------|-------------|----------|--------------
+`VAULT_ADDR`                      | Vault address to connect to | Yes | `https://x.x.x.x:8200`
+`VAULT_AUTH_PROVIDER`             | Name of the configured AWS IAM auth route on Vault | Yes | `aws`
+`VAULT_AUTH_ROLE`                 | Vault role to authenticate as | Yes | `lambda-app`
+`VAULT_IAM_SERVER_ID`             | Value to pass to the Vault server via the [`X-Vault-AWS-IAM-Server-ID` HTTP Header for AWS Authentication](https://www.vaultproject.io/api-docs/auth/aws#iam_server_id_header_value) | No | `vault.example.com`
+`VAULT_SECRET_PATH`               | Secret path to read, written to `/tmp/vault/secret.json` unless `VAULT_SECRET_FILE` is specified | No | `database/creds/lambda-app`
+`VAULT_SECRET_FILE`               | Path to write the JSON response for `VAULT_SECRET_PATH` | No | `/tmp/db.json`
+`VAULT_SECRET_PATH_FOO`           | Additional secret path to read, where FOO can be any name, as long as a matching `VAULT_SECRET_FILE_FOO` is specified | No | `secret/lambda-app/token`
+`VAULT_SECRET_FILE_FOO`           | Must exist for any correspondingly named `VAULT_SECRET_PATH_FOO`. Name has no further effect beyond matching to the correct path variable | No | `/tmp/token`
+`VAULT_TOKEN_EXPIRY_GRACE_PERIOD` | Period at the end of the proxy server's auth token TTL where it will consider the token expired and attempt to re-authenticate to Vault. Must have a unit and be parseable by `time.Duration`. Defaults to 10s. | No | `1m`
 
 The remaining environment variables are not required, and function exactly as
 described in the [Vault Commands (CLI)][vault-env-vars] documentation. However,
 note that `VAULT_CLIENT_TIMEOUT` cannot extend the timeout beyond the 10s
-timeout imposed by the Extensions API.
+initialization timeout imposed by the Extensions API when writing files to disk.
 
 Environment variable    | Description | Required | Example value
 ------------------------|-------------|----------|--------------

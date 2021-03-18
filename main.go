@@ -36,7 +36,7 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
-	srv, err := runExtension(logger, &wg)
+	srv, err := runExtension(ctx, logger, &wg)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -71,26 +71,33 @@ func main() {
 	logger.Println("Graceful shutdown complete")
 }
 
-func runExtension(logger *log.Logger, wg *sync.WaitGroup) (*http.Server, error) {
+func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (*http.Server, error) {
 	logger.Println("Initialising")
 
 	vaultAddr := os.Getenv(api.EnvVaultAddress)
-	vaultAuthRole := os.Getenv("VAULT_AUTH_ROLE")
-	vaultAuthProvider := os.Getenv("VAULT_AUTH_PROVIDER")
-	vaultIAMServerID := os.Getenv("VAULT_IAM_SERVER_ID") // Optional
+	authConfig := config.AuthConfigFromEnv()
 
-	if vaultAddr == "" || vaultAuthProvider == "" || vaultAuthRole == "" {
+	if vaultAddr == "" || authConfig.Provider == "" || authConfig.Role == "" {
 		return nil, errors.New("missing VAULT_ADDR, VAULT_AUTH_PROVIDER or VAULT_AUTH_ROLE environment variables")
 	}
 
-	client, config, err := vault.NewClient(logger, vaultAuthRole, vaultAuthProvider, vaultIAMServerID)
+	vaultConfig := api.DefaultConfig()
+	if vaultConfig.Error != nil {
+		return nil, fmt.Errorf("error making default vault config for extension: %w", vaultConfig.Error)
+	}
+	client, err := vault.NewClient(logger, vaultConfig, authConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
 		return nil, fmt.Errorf("nil client returned: %w", err)
 	}
 
-	err = writePreconfiguredSecrets(client)
+	_, err = client.Token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error logging in to Vault: %w", err)
+	}
+
+	err = writePreconfiguredSecrets(client.VaultClient)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +106,7 @@ func runExtension(logger *log.Logger, wg *sync.WaitGroup) (*http.Server, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
 	}
-	srv := server.New(logger, config, client.Token())
+	srv := server.New(logger, client)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
