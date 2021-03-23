@@ -6,7 +6,7 @@ read secrets from your Vault deployment. To use it, include the following ARN as
 layer in your Lambda function:
 
 ```text
-arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:7
+arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:8
 ```
 
 Where region may be any of `ap-northeast-1`, `ap-northeast-2`, `ap-south-1`,
@@ -59,7 +59,7 @@ vault write auth/aws/role/vault-lambda-role \
 Add the extension to your Lambda layers using the console or [cli][lambda-add-layer-cli]:
 
 ```text
-arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:7
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:8
 ```
 
 Configure the extension using [Lambda environment variables][lambda-env-vars]:
