@@ -1,5 +1,7 @@
 ## Unreleased
 
+## v0.3.0 (March 23rd, 2021)
+
 FEATURES:
 
 * Proxy server mode: The extension now starts a Vault API proxy at
