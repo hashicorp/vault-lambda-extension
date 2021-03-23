@@ -2,8 +2,10 @@
 
 FEATURES:
 
-* Server mode: The extension now starts a Vault API proxy at `http://127.0.0.1:8200`. [[GH-27](https://github.com/hashicorp/vault-lambda-extension/pull/27)]
-  * **Breaking change:** The extension no longer writes a Vault token to disk.
+* Proxy server mode: The extension now starts a Vault API proxy at
+  `http://127.0.0.1:8200` [[GH-27](https://github.com/hashicorp/vault-lambda-extension/pull/27)]
+  * **Breaking change:** The extension no longer writes its own Vault auth token
+    to disk. Writing pre-configured secrets to disk remains unchanged.
 
 ## v0.2.0 (January 20th, 2021)
 
