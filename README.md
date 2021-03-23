@@ -29,11 +29,12 @@ The extension authenticates with Vault using [AWS IAM auth][vault-aws-iam-auth],
 and all configuration is supplied via environment variables. There are two methods
 to read secrets, which can both be used side-by-side:
 
+* **Recommended**: Make unauthenticated requests to the extension's local proxy
+  server at `http://127.0.0.1:8200`, which will add an authentication header and
+  proxy to the configured `VAULT_ADDR`. Responses from Vault are returned without
+  modification.
 * Configure environment variables such as `VAULT_SECRET_PATH` for the extension
   to read a secret and write it to disk.
-* **Recommended**: Make unauthenticated requests to the extension's local server at
-  `http://127.0.0.1:8200`, which will add an authentication header and proxy to
-  the configured `VAULT_ADDR`.
 
 ## Getting Started
 
@@ -156,10 +157,16 @@ extension to write secrets to disk, because the extension will only write to dis
 once per execution environment, rather than once per function invocation. If you
 use [provisioned concurrency][lambda-provisioned-concurrency] or if your Lambda
 is invoked often enough that execution contexts live beyond the lifetime of the
-secret, then secrets on disk are likely to become invalid. In line with
-[Lambda best practices][lambda-best-practices], we recommend avoiding writing
-secrets to disk where possible, and exclusively consuming secrets via the proxy
-server.
+secret, then secrets on disk are likely to become invalid.
+
+In line with [Lambda best practices][lambda-best-practices], we recommend avoiding
+writing secrets to disk where possible, and exclusively consuming secrets via
+the proxy server. However, the proxy server will still not perform any additional
+processing with returned secrets such as automatic lease renewal. The proxy server's
+own Vault auth token is the only thing that gets automatically refreshed. It will
+synchronously refresh its own token before proxying requests if the token is
+expired (including a grace window), and it will attempt to renew its token if the
+token is nearly expired but renewable.
 
 [vault-aws-iam-auth]: https://www.vaultproject.io/docs/auth/aws
 [vault-env-vars]: https://www.vaultproject.io/docs/commands#environment-variables
