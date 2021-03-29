@@ -1,9 +1,20 @@
 # vault-lambda-extension
 
+----
+
+**Please note**: We take Vault's security and our users' trust very seriously. If you believe you have found a security issue in Vault or vault-lambda-extension, _please responsibly disclose_ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
+
+----
+
 This repository contains the source code for HashiCorp's Vault AWS Lambda extension.
 The extension utilizes the AWS Lambda Extensions API to help your Lambda function
-read secrets from your Vault deployment. To use it, include the following ARN as a
-layer in your Lambda function:
+read secrets from your Vault deployment.
+
+**Note: The AWS Lambda Extensions API and this extension are both currently public preview.**
+
+## Usage
+
+To use the extension, include the following ARN as a layer in your Lambda function:
 
 ```text
 arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:8
@@ -18,11 +29,12 @@ The extension authenticates with Vault using [AWS IAM auth][vault-aws-iam-auth],
 and all configuration is supplied via environment variables. There are two methods
 to read secrets, which can both be used side-by-side:
 
+* **Recommended**: Make unauthenticated requests to the extension's local proxy
+  server at `http://127.0.0.1:8200`, which will add an authentication header and
+  proxy to the configured `VAULT_ADDR`. Responses from Vault are returned without
+  modification.
 * Configure environment variables such as `VAULT_SECRET_PATH` for the extension
   to read a secret and write it to disk.
-* Make unauthenticated requests to the extension's local server at
-  `http://127.0.0.1:8200`, which will add an authentication header and proxy to
-  the configured `VAULT_ADDR`.
 
 ## Getting Started
 
@@ -80,6 +92,8 @@ from the Vault API module.
 Alternatively, you can send normal Vault API requests over HTTP to the local
 proxy at `http://127.0.0.1:8200`, and the extension will add authentication
 before forwarding the request. Vault responses will be returned unmodified.
+Although local communication is over plain HTTP, the proxy server will use TLS
+to communicate with Vault if configured to do so as detailed below.
 
 ## Configuration
 
@@ -93,7 +107,7 @@ Environment variable              | Description | Required | Example value
 `VAULT_ADDR`                      | Vault address to connect to | Yes | `https://x.x.x.x:8200`
 `VAULT_AUTH_PROVIDER`             | Name of the configured AWS IAM auth route on Vault | Yes | `aws`
 `VAULT_AUTH_ROLE`                 | Vault role to authenticate as | Yes | `lambda-app`
-`VAULT_IAM_SERVER_ID`             | Value to pass to the Vault server via the [`X-Vault-AWS-IAM-Server-ID` HTTP Header for AWS Authentication](https://www.vaultproject.io/api-docs/auth/aws#iam_server_id_header_value) | No | `vault.example.com`
+`VAULT_IAM_SERVER_ID`             | Value to pass to the Vault server via the [`X-Vault-AWS-IAM-Server-ID` HTTP Header for AWS Authentication][vault-iam-server-id-header] | No | `vault.example.com`
 `VAULT_SECRET_PATH`               | Secret path to read, written to `/tmp/vault/secret.json` unless `VAULT_SECRET_FILE` is specified | No | `database/creds/lambda-app`
 `VAULT_SECRET_FILE`               | Path to write the JSON response for `VAULT_SECRET_PATH` | No | `/tmp/db.json`
 `VAULT_SECRET_PATH_FOO`           | Additional secret path to read, where FOO can be any name, as long as a matching `VAULT_SECRET_FILE_FOO` is specified | No | `secret/lambda-app/token`
@@ -118,19 +132,50 @@ Environment variable    | Description | Required | Example value
 `VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details. Ignored by proxy server | No | `10`
 `VAULT_NAMESPACE`       | The namespace to use for pre-configured secrets. Ignored by proxy server | No | `education`
 
+### AWS STS client configuration
+
+In addition to Vault configuration, you can configure certain aspects of the STS
+client the extension uses through the usual AWS environment variables. For example,
+if your Vault instance's IAM auth is configured to use regional STS endpoints:
+
+```bash
+vault write auth/aws/config/client \
+  sts_endpoint="https://sts.eu-west-1.amazonaws.com" \
+  sts_region="eu-west-1"
+```
+
+Then you may need to configure the extension's STS client to also use the regional
+STS endpoint by setting `AWS_STS_REGIONAL_ENDPOINTS=regional`, because both the AWS Golang
+SDK and Vault IAM auth method default to using the global endpoint in many regions.
+See documentation on [`sts_regional_endpoints`][lambda-sts-regional-endpoints] for more information.
+
 ## Limitations
 
-For this early release, the extension does not support automatic secret renewal.
-This means once a secret is written to disk, it will not be refreshed once it
-expires. This may cause problems if you use [provisioned concurrency][lambda-provisioned-concurrency]
-or if your Lambda is invoked often enough that execution contexts live beyond
-the lifetime of the secret.
+Secrets written to disk or returned from the proxy server will not be automatically
+refreshed when they expire. This is particularly important if you configure the
+extension to write secrets to disk, because the extension will only write to disk
+once per execution environment, rather than once per function invocation. If you
+use [provisioned concurrency][lambda-provisioned-concurrency] or if your Lambda
+is invoked often enough that execution contexts live beyond the lifetime of the
+secret, then secrets on disk are likely to become invalid.
+
+In line with [Lambda best practices][lambda-best-practices], we recommend avoiding
+writing secrets to disk where possible, and exclusively consuming secrets via
+the proxy server. However, the proxy server will still not perform any additional
+processing with returned secrets such as automatic lease renewal. The proxy server's
+own Vault auth token is the only thing that gets automatically refreshed. It will
+synchronously refresh its own token before proxying requests if the token is
+expired (including a grace window), and it will attempt to renew its token if the
+token is nearly expired but renewable.
 
 [vault-aws-iam-auth]: https://www.vaultproject.io/docs/auth/aws
 [vault-env-vars]: https://www.vaultproject.io/docs/commands#environment-variables
 [vault-api-secret-struct]: https://github.com/hashicorp/vault/blob/api/v1.0.4/api/secret.go#L15
 [vault-security-model]: https://www.vaultproject.io/docs/internals/security
+[vault-iam-server-id-header]: https://www.vaultproject.io/api-docs/auth/aws#iam_server_id_header_value
 [lambda-supported-runtimes]: https://docs.aws.amazon.com/lambda/latest/dg/runtimes-extensions-api.html
 [lambda-env-vars]: https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html
 [lambda-add-layer-cli]: https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-using
 [lambda-provisioned-concurrency]: https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html#configuration-concurrency-provisioned
+[lambda-best-practices]: https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html
+[lambda-sts-regional-endpoints]: https://docs.aws.amazon.com/credref/latest/refdocs/setting-global-sts_regional_endpoints.html
