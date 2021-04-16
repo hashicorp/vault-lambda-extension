@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/hashicorp/vault-lambda-extension/config"
@@ -19,6 +21,7 @@ import (
 
 const (
 	tokenExpiryGracePeriodEnv     = "VAULT_TOKEN_EXPIRY_GRACE_PERIOD"
+	stsEndpointRegionEnv          = "VAULT_STS_ENDPOINT_REGION_ENV"
 	defaultTokenExpiryGracePeriod = 10 * time.Second
 )
 
@@ -48,7 +51,16 @@ func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.Au
 		return nil, fmt.Errorf("error making extension: %w", err)
 	}
 
-	ses := session.Must(session.NewSession())
+	stsEndpointRegionEnv, present := os.LookupEnv(stsEndpointRegionEnv)
+	var ses *session.Session
+	if present {
+		ses = session.Must(session.NewSession(&aws.Config{
+			Region:              aws.String(stsEndpointRegionEnv),
+			STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
+		}))
+	} else {
+		ses = session.Must(session.NewSession())
+	}
 	stsSvc := sts.New(ses)
 
 	expiryGracePeriod, err := parseTokenExpiryGracePeriod()
