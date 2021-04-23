@@ -51,11 +51,11 @@ func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.Au
 		return nil, fmt.Errorf("error making extension: %w", err)
 	}
 
-	stsEndpointRegionEnv, present := os.LookupEnv(stsEndpointRegionEnv)
+	region, present := os.LookupEnv(stsEndpointRegionEnv)
 	var ses *session.Session
 	if present {
 		ses = session.Must(session.NewSession(&aws.Config{
-			Region:              aws.String(stsEndpointRegionEnv),
+			Region:              aws.String(region),
 			STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
 		}))
 	} else {
