@@ -21,7 +21,7 @@ import (
 
 const (
 	tokenExpiryGracePeriodEnv     = "VAULT_TOKEN_EXPIRY_GRACE_PERIOD"
-	stsEndpointRegionEnv          = "VAULT_STS_ENDPOINT_REGION_ENV"
+	stsEndpointRegionEnv          = "VAULT_STS_ENDPOINT_REGION"
 	defaultTokenExpiryGracePeriod = 10 * time.Second
 )
 
