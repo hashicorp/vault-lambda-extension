@@ -15,10 +15,11 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashicorp/vault-lambda-extension/config"
-	"github.com/hashicorp/vault-lambda-extension/extension"
-	"github.com/hashicorp/vault-lambda-extension/server"
-	"github.com/hashicorp/vault-lambda-extension/vault"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/hashicorp/vault-lambda-extension/internal/config"
+	"github.com/hashicorp/vault-lambda-extension/internal/extension"
+	"github.com/hashicorp/vault-lambda-extension/internal/server"
+	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/api"
 )
 
@@ -85,7 +86,8 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 	if vaultConfig.Error != nil {
 		return nil, fmt.Errorf("error making default vault config for extension: %w", vaultConfig.Error)
 	}
-	client, err := vault.NewClient(logger, vaultConfig, authConfig)
+	ses := session.Must(session.NewSession())
+	client, err := vault.NewClient(logger, vaultConfig, authConfig, ses)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {

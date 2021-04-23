@@ -12,8 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/vault-lambda-extension/config"
-	"github.com/hashicorp/vault-lambda-extension/vault"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/hashicorp/vault-lambda-extension/internal/config"
+	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
+	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
 )
@@ -55,9 +57,12 @@ var (
 )
 
 func TestProxy(t *testing.T) {
-	vault := fakeVault()
-	defer vault.Close()
-	proxyAddr, close := startProxy(t, vault.URL)
+	fakeVault := fakeVault()
+	defer fakeVault.Close()
+	ses := session.Must(session.NewSession())
+	sts := ststest.FakeSTS(ses)
+	defer sts.Close()
+	proxyAddr, close := startProxy(t, fakeVault.URL, ses)
 	defer close()
 
 	t.Run("happy path bare http client", func(t *testing.T) {
@@ -101,11 +106,11 @@ func TestProxy(t *testing.T) {
 	})
 }
 
-func startProxy(t *testing.T, vaultAddress string) (string, func() error) {
+func startProxy(t *testing.T, vaultAddress string, ses *session.Session) (string, func() error) {
 	vaultConfig := api.DefaultConfig()
 	require.NoError(t, vaultConfig.Error)
 	vaultConfig.Address = vaultAddress
-	client, err := vault.NewClient(log.New(ioutil.Discard, "", 0), vaultConfig, config.AuthConfig{})
+	client, err := vault.NewClient(log.New(ioutil.Discard, "", 0), vaultConfig, config.AuthConfig{}, ses)
 	require.NoError(t, err)
 	client.VaultConfig.Address = vaultAddress
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
