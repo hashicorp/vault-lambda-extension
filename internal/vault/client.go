@@ -48,8 +48,6 @@ func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.Au
 		return nil, fmt.Errorf("error making extension: %w", err)
 	}
 
-	stsSvc := sts.New(awsSes)
-
 	expiryGracePeriod, err := parseTokenExpiryGracePeriod()
 	if err != nil {
 		return nil, err
@@ -60,7 +58,7 @@ func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.Au
 		VaultConfig: vaultConfig,
 
 		logger:     logger,
-		stsSvc:     stsSvc,
+		stsSvc:     sts.New(awsSes),
 		authConfig: authConfig,
 
 		tokenExpiryGracePeriod: expiryGracePeriod,

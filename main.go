@@ -15,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/extension"
@@ -24,7 +26,8 @@ import (
 )
 
 const (
-	extensionName = "vault-lambda-extension"
+	extensionName        = "vault-lambda-extension"
+	stsEndpointRegionEnv = "VAULT_STS_ENDPOINT_REGION"
 )
 
 func main() {
@@ -86,7 +89,17 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 	if vaultConfig.Error != nil {
 		return nil, fmt.Errorf("error making default vault config for extension: %w", vaultConfig.Error)
 	}
-	ses := session.Must(session.NewSession())
+
+	region, present := os.LookupEnv(stsEndpointRegionEnv)
+	var ses *session.Session
+	if present {
+		ses = session.Must(session.NewSession(&aws.Config{
+			Region:              aws.String(region),
+			STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
+		}))
+	} else {
+		ses = session.Must(session.NewSession())
+	}
 	client, err := vault.NewClient(logger, vaultConfig, authConfig, ses)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)

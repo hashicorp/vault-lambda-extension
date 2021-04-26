@@ -113,6 +113,7 @@ Environment variable              | Description | Required | Example value
 `VAULT_SECRET_PATH_FOO`           | Additional secret path to read, where FOO can be any name, as long as a matching `VAULT_SECRET_FILE_FOO` is specified | No | `secret/lambda-app/token`
 `VAULT_SECRET_FILE_FOO`           | Must exist for any correspondingly named `VAULT_SECRET_PATH_FOO`. Name has no further effect beyond matching to the correct path variable | No | `/tmp/token`
 `VAULT_TOKEN_EXPIRY_GRACE_PERIOD` | Period at the end of the proxy server's auth token TTL where it will consider the token expired and attempt to re-authenticate to Vault. Must have a unit and be parseable by `time.Duration`. Defaults to 10s. | No | `1m`
+`VAULT_STS_ENDPOINT_REGION`       | The region of the STS regional endpoint to authenticate with. If the AWS IAM auth mount specified uses a regional STS endpoint, then this needs to match the region of that endpoint. Defaults to using the global endpoint, or the region the Lambda resides in if `AWS_STS_REGIONAL_ENDPOINTS` is set to `regional` | No | `eu-west-1`
 
 The remaining environment variables are not required, and function exactly as
 described in the [Vault Commands (CLI)][vault-env-vars] documentation. However,

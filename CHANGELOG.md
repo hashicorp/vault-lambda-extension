@@ -1,5 +1,9 @@
 ## Unreleased
 
+FEATURES:
+
+Add `VAULT_STS_ENDPOINT_REGION` to make STS regional endpoint used for auth configurable separately from the region Lambda is deployed in. [[GH-30](https://github.com/hashicorp/vault-lambda-extension/pull/30)]
+
 ## v0.3.0 (March 23rd, 2021)
 
 FEATURES:
