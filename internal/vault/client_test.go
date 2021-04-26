@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/hashicorp/vault-lambda-extension/config"
+	"github.com/hashicorp/vault-lambda-extension/internal/config"
+	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
 	"github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +44,8 @@ var (
 func TestTokenRenewal(t *testing.T) {
 	vault := fakeVault()
 	defer vault.Close()
-	stsServer := fakeSTS()
+	ses := session.Must(session.NewSession())
+	stsServer := ststest.FakeSTS(ses)
 	defer stsServer.Close()
 
 	nullLogger := log.New(ioutil.Discard, "", 0)
@@ -55,16 +56,6 @@ func TestTokenRenewal(t *testing.T) {
 		require.NoError(t, err)
 		return vaultClient
 	}
-	ses := session.Must(session.NewSession())
-	ses.Config.
-		WithEndpoint(stsServer.URL).
-		WithRegion("us-east-1").
-		WithCredentials(credentials.NewStaticCredentialsFromCreds(credentials.Value{
-			ProviderName:    session.EnvProviderName,
-			AccessKeyID:     "foo",
-			SecretAccessKey: "foo",
-			SessionToken:    "foo",
-		}))
 	stsSvc := sts.New(ses)
 
 	t.Run("TestExpired", func(t *testing.T) {
@@ -339,10 +330,4 @@ func generateSecretFunc(t *testing.T, secrets []*api.Secret) func() (*api.Secret
 		secrets = secrets[1:]
 		return secret, nil
 	}
-}
-
-func fakeSTS() *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	}))
 }

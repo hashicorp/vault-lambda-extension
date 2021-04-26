@@ -11,17 +11,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/hashicorp/vault-lambda-extension/config"
+	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault/api"
 )
 
 const (
 	tokenExpiryGracePeriodEnv     = "VAULT_TOKEN_EXPIRY_GRACE_PERIOD"
-	stsEndpointRegionEnv          = "VAULT_STS_ENDPOINT_REGION"
 	defaultTokenExpiryGracePeriod = 10 * time.Second
 )
 
@@ -45,23 +42,11 @@ type Client struct {
 
 // NewClient uses the AWS IAM auth method configured in a Vault cluster to
 // authenticate the execution role and create a Vault API client.
-func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.AuthConfig) (*Client, error) {
+func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.AuthConfig, awsSes *session.Session) (*Client, error) {
 	vaultClient, err := api.NewClient(vaultConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error making extension: %w", err)
 	}
-
-	region, present := os.LookupEnv(stsEndpointRegionEnv)
-	var ses *session.Session
-	if present {
-		ses = session.Must(session.NewSession(&aws.Config{
-			Region:              aws.String(region),
-			STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
-		}))
-	} else {
-		ses = session.Must(session.NewSession())
-	}
-	stsSvc := sts.New(ses)
 
 	expiryGracePeriod, err := parseTokenExpiryGracePeriod()
 	if err != nil {
@@ -73,7 +58,7 @@ func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.Au
 		VaultConfig: vaultConfig,
 
 		logger:     logger,
-		stsSvc:     stsSvc,
+		stsSvc:     sts.New(awsSes),
 		authConfig: authConfig,
 
 		tokenExpiryGracePeriod: expiryGracePeriod,
@@ -186,7 +171,7 @@ func (c *Client) expired() bool {
 
 // Returns true if tokenExpiry time is in less than 20% of tokenTTL.
 func (c *Client) shouldRenew() bool {
-	remaining := c.tokenExpiry.Sub(time.Now())
+	remaining := time.Until(c.tokenExpiry)
 	return c.tokenRenewable && remaining.Nanoseconds() < c.tokenTTL.Nanoseconds()/5
 }
 
