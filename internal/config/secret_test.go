@@ -26,7 +26,7 @@ func TestParseConfiguredSecrets(t *testing.T) {
 				"VAULT_SECRET_PATH": "/kv/data/foo",
 			},
 			expected: []ConfiguredSecret{
-				ConfiguredSecret{
+				{
 					name:      "",
 					VaultPath: "/kv/data/foo",
 					FilePath:  "/tmp/vault/secret.json",
@@ -40,7 +40,7 @@ func TestParseConfiguredSecrets(t *testing.T) {
 				"VAULT_SECRET_FILE": "/tmp/vault/secret/foo",
 			},
 			expected: []ConfiguredSecret{
-				ConfiguredSecret{
+				{
 					name:      "",
 					VaultPath: "/kv/data/foo",
 					FilePath:  "/tmp/vault/secret/foo",
@@ -56,12 +56,12 @@ func TestParseConfiguredSecrets(t *testing.T) {
 				"VAULT_SECRET_FILE_FOO": "/FOO/file/path",
 			},
 			expected: []ConfiguredSecret{
-				ConfiguredSecret{
+				{
 					name:      "",
 					VaultPath: "/kv/data/foo",
 					FilePath:  "/tmp/vault/secret/foo",
 				},
-				ConfiguredSecret{
+				{
 					name:      "FOO",
 					VaultPath: "FOO vaultPath",
 					FilePath:  "/FOO/file/path",
@@ -78,17 +78,17 @@ func TestParseConfiguredSecrets(t *testing.T) {
 				"VAULT_SECRET_FILE_RELATIVE": "my-special-location.yaml",
 			},
 			expected: []ConfiguredSecret{
-				ConfiguredSecret{
+				{
 					name:      "",
 					VaultPath: "default location",
 					FilePath:  "/tmp/vault/secret.json",
 				},
-				ConfiguredSecret{
+				{
 					name:      "ABSOLUTE",
 					VaultPath: "a",
 					FilePath:  "/somewhere/else/completely",
 				},
-				ConfiguredSecret{
+				{
 					name:      "RELATIVE",
 					VaultPath: "a",
 					FilePath:  "/tmp/vault/my-special-location.yaml",

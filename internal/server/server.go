@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/hashicorp/vault-lambda-extension/vault"
+	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/sdk/helper/consts"
 )
 
