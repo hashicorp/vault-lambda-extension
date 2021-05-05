@@ -48,13 +48,15 @@ pricing.**
 
 ### Adding the extension to your existing Lambda and Vault infrastructure
 
-Requirements:
+#### Requirements
 
 * ARN of the role your Lambda runs as
 * An instance of Vault accessible from AWS Lambda
 * An authenticated `vault` client
 * A secret in Vault that you want your Lambda to access, and a policy giving read access to it
 * **Your Lambda function must use one of the [supported runtimes][lambda-supported-runtimes] for extensions**
+
+#### 1. Configure Vault
 
 First, set up AWS IAM auth on Vault, and attach a policy to your ARN:
 
@@ -68,11 +70,37 @@ vault write auth/aws/role/vault-lambda-role \
     ttl=1h
 ```
 
-Add the extension to your Lambda layers using the console or [cli][lambda-add-layer-cli]:
+#### 2. Option a) Install the extension for Lambda functions packaged in zip archives
+
+If you deploy your Lambda function as a zip file, you can add the extension
+to your Lambda layers using the console or [cli][lambda-add-layer-cli]:
 
 ```text
 arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:8
 ```
+
+#### 2. Option b) Install the extension for Lambda functions packaged in container images
+
+If you deploy your Lambda function as a container image, simply place the built
+binary in the `/opt/extensions` directory of your image. There is currently no
+publicly accessible download location for the pre-built binary.
+
+To build from source:
+
+```bash
+# Requires Golang installed. Run from the root of this repository.
+GOOS=linux GOARCH=amd64 go build -o vault-lambda-extension main.go
+```
+
+To fetch from the published AWS Lambda layer:
+
+```bash
+# Requires `curl`, `unzip`, `aws` CLI and authentication for `aws`
+curl $(aws lambda get-layer-version-by-arn --arn arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:8 --query 'Content.Location' --output text --region us-east-1) --output vault-lambda-extension.zip
+unzip vault-lambda-extension.zip
+```
+
+#### 3. Configure vault-lambda-extension
 
 Configure the extension using [Lambda environment variables][lambda-env-vars]:
 
