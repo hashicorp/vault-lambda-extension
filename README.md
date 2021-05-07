@@ -169,6 +169,19 @@ synchronously refresh its own token before proxying requests if the token is
 expired (including a grace window), and it will attempt to renew its token if the
 token is nearly expired but renewable.
 
+## Performance impact
+
+AWS Lambda pricing is based on [number of invocations, time of execution and memory
+used][lambda-pricing]. The following table details some approximate performance
+related statistics to help assess the cost impact of this extension.
+
+Metric | Value | Description | Derivation
+-------|-------|-------------|-----------
+Layer size | 8.5MB | The size of the unpacked extension binary | `ls -la`
+Init latency | 8.5ms (standard deviation 2.4ms) + one network round trip to authenticate to Vault | Extension initialization time in a new execution environment. Authentication round trip time will be highly deployment-dependent | Instrumented in code
+Invoke latency | <1ms | The base processing time for each function invocation, assuming no calls to the proxy server | Instrumented in code
+Memory impact | 12MB | The marginal impact on "Max Memory Used" when running the extension | As reported by Lambda when running Hello World function with and without extension
+
 [vault-aws-iam-auth]: https://www.vaultproject.io/docs/auth/aws
 [vault-env-vars]: https://www.vaultproject.io/docs/commands#environment-variables
 [vault-api-secret-struct]: https://github.com/hashicorp/vault/blob/api/v1.0.4/api/secret.go#L15
@@ -180,3 +193,4 @@ token is nearly expired but renewable.
 [lambda-provisioned-concurrency]: https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html#configuration-concurrency-provisioned
 [lambda-best-practices]: https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html
 [lambda-sts-regional-endpoints]: https://docs.aws.amazon.com/credref/latest/refdocs/setting-global-sts_regional_endpoints.html
+[lambda-pricing]: https://aws.amazon.com/lambda/pricing/
