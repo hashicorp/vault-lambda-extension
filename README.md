@@ -81,18 +81,18 @@ arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:8
 
 #### 2. Option b) Install the extension for Lambda functions packaged in container images
 
-If you deploy your Lambda function as a container image, simply place the built
-binary in the `/opt/extensions` directory of your image. There is currently no
-publicly accessible download location for the pre-built binary.
+Alternatively, if you deploy your Lambda function as a container image, simply
+place the built binary in the `/opt/extensions` directory of your image. There
+is currently no publicly accessible download location for the pre-built binary.
 
-To build from source:
+To build the binary from source:
 
 ```bash
 # Requires Golang installed. Run from the root of this repository.
 GOOS=linux GOARCH=amd64 go build -o vault-lambda-extension main.go
 ```
 
-To fetch from the published AWS Lambda layer:
+Or to fetch the binary from the published AWS Lambda layer:
 
 ```bash
 # Requires `curl`, `unzip`, `aws` CLI and authentication for `aws`
