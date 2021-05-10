@@ -173,7 +173,8 @@ token is nearly expired but renewable.
 
 AWS Lambda pricing is based on [number of invocations, time of execution and memory
 used][lambda-pricing]. The following table details some approximate performance
-related statistics to help assess the cost impact of this extension.
+related statistics to help assess the cost impact of this extension. Benchmarks were
+run with 128MB of memory allocated.
 
 Metric | Value | Description | Derivation
 -------|-------|-------------|-----------
