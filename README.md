@@ -173,8 +173,10 @@ token is nearly expired but renewable.
 
 AWS Lambda pricing is based on [number of invocations, time of execution and memory
 used][lambda-pricing]. The following table details some approximate performance
-related statistics to help assess the cost impact of this extension. Benchmarks were
-run with 128MB of memory allocated.
+related statistics to help assess the cost impact of this extension. Note that AWS
+Lambda allocates [CPU power in proportion to memory][lambda-memory-cpu] so results
+will vary widely. These benchmarks were run with the minimum 128MB of memory allocated
+so aim to give an approximate baseline.
 
 Metric | Value | Description | Derivation
 -------|-------|-------------|-----------
@@ -195,3 +197,4 @@ Memory impact | 12MB | The marginal impact on "Max Memory Used" when running the
 [lambda-best-practices]: https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html
 [lambda-sts-regional-endpoints]: https://docs.aws.amazon.com/credref/latest/refdocs/setting-global-sts_regional_endpoints.html
 [lambda-pricing]: https://aws.amazon.com/lambda/pricing/
+[lambda-memory-cpu]: https://docs.aws.amazon.com/lambda/latest/dg/configuration-memory.html
