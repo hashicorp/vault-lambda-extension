@@ -33,8 +33,10 @@ make the following modifications:
 * Tag the image, and push it to your new ECR repository:
 
   ```bash
-  docker tag demo-function:latest <account>.dkr.ecr.<region>.amazonaws.com/demo-function:latest
-  docker push <account>.dkr.ecr.<region>.amazonaws.com/demo-function:latest
+  export AWS_ACCOUNT="ACCOUNT HERE"
+  export AWS_REGION="REGION HERE"
+  docker tag demo-function:latest ${AWS_ACCOUNT?}.dkr.ecr.${AWS_REGION?}.amazonaws.com/demo-function:latest
+  docker push ${AWS_ACCOUNT?}.dkr.ecr.${AWS_REGION?}.amazonaws.com/demo-function:latest
   ```
 
 * Update `quick-start/terraform/lambda.tf` to use your image
