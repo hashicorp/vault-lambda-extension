@@ -38,6 +38,11 @@ to read secrets, which can both be used side-by-side:
 
 ## Getting Started
 
+The [learn guide][vault-learn-guide] is the most complete and fully explained
+tutorial on getting started from scratch. Alternatively, you can follow the
+similar quick start guide below or see the instructions for adding the extension
+to your existing function.
+
 ### Quick Start
 
 The [quick-start](./quick-start) directory has an end to end example, for which
@@ -200,6 +205,7 @@ synchronously refresh its own token before proxying requests if the token is
 expired (including a grace window), and it will attempt to renew its token if the
 token is nearly expired but renewable.
 
+[vault-learn-guide]: https://learn.hashicorp.com/tutorials/vault/aws-lambda
 [vault-aws-iam-auth]: https://www.vaultproject.io/docs/auth/aws
 [vault-env-vars]: https://www.vaultproject.io/docs/commands#environment-variables
 [vault-api-secret-struct]: https://github.com/hashicorp/vault/blob/api/v1.0.4/api/secret.go#L15
