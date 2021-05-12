@@ -100,6 +100,9 @@ curl $(aws lambda get-layer-version-by-arn --arn arn:aws:lambda:us-east-1:634166
 unzip vault-lambda-extension.zip
 ```
 
+See the [demo-function readme](./quick-start/demo-function/README.md) for a full
+end to end example of deploying functions with extensions in a container image.
+
 #### 3. Configure vault-lambda-extension
 
 Configure the extension using [Lambda environment variables][lambda-env-vars]:
