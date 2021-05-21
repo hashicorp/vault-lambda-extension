@@ -1,14 +1,11 @@
 # Based on vanilla Dockerfile to build a Golang image from:
 # https://docs.aws.amazon.com/lambda/latest/dg/go-image.html
-# The only significant modification is to copy the extension binary into the image.
-FROM public.ecr.aws/lambda/provided:al2 as build
-
-# Install Golang
-RUN yum install -y golang
-RUN go env -w GOPROXY=direct
+# The main modification is to copy the extension binary into the image.
+FROM golang:1.16.4 as build
 
 # Cache dependencies
-ADD go.mod go.sum ./
+ADD go.mod go.sum /go/src/vault-lambda-extension/
+WORKDIR /go/src/vault-lambda-extension/
 RUN go mod download
 
 # Build
