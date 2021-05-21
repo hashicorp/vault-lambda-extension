@@ -45,6 +45,48 @@ terraform apply
 terraform destroy
 ```
 
+### Deploying demo-function as an image
+
+This guide defaults to deploying the demo function in a zip format.
+
+Alternatively, to deploy using a container format Lambda, make the following
+modifications:
+
+* Create an ECR repository. You can use AWS CLI or console, or add this to
+  the Terraform config:
+
+  ```hcl
+  resource "aws_ecr_repository" "demo-function" {
+    name = "demo-function"
+  }
+  ```
+
+  **Note:** If you use Terraform to create the ECR repository, you will need
+  to apply it before running `docker push` below, but creating the Lambda
+  function will fail until you have pushed the image, so you may have to run the
+  `terraform apply` step twice to resolve that partial failure.
+
+* Package the extension and function together into a Docker image. Use the
+  `build-container.sh` script in this directory:
+
+  ```bash
+  ./build-container.sh
+  ```
+
+* Tag the image, and push it to your new ECR repository:
+
+  ```bash
+  export AWS_ACCOUNT="ACCOUNT HERE"
+  export AWS_REGION="REGION HERE"
+  docker tag demo-function:latest ${AWS_ACCOUNT?}.dkr.ecr.${AWS_REGION?}.amazonaws.com/demo-function:latest
+  docker push ${AWS_ACCOUNT?}.dkr.ecr.${AWS_REGION?}.amazonaws.com/demo-function:latest
+  ```
+
+* Update `quick-start/terraform/lambda.tf` to use your image
+  * Set `image_uri = "<account>.dkr.ecr.<region>.amazonaws.com/demo-function:latest"`
+  * Set `package_type  = "Image"`
+  * Unset `filename`, `handler`, `runtime`, and `layers`
+
 ## Credit
 
 Adapted from AWS KMS guides in the [vault-guides](https://github.com/hashicorp/vault-guides) repo.

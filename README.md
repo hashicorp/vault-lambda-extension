@@ -38,6 +38,11 @@ to read secrets, which can both be used side-by-side:
 
 ## Getting Started
 
+The [learn guide][vault-learn-guide] is the most complete and fully explained
+tutorial on getting started from scratch. Alternatively, you can follow the
+similar quick start guide below or see the instructions for adding the extension
+to your existing function.
+
 ### Quick Start
 
 The [quick-start](./quick-start) directory has an end to end example, for which
@@ -48,13 +53,15 @@ pricing.**
 
 ### Adding the extension to your existing Lambda and Vault infrastructure
 
-Requirements:
+#### Requirements
 
 * ARN of the role your Lambda runs as
 * An instance of Vault accessible from AWS Lambda
 * An authenticated `vault` client
 * A secret in Vault that you want your Lambda to access, and a policy giving read access to it
 * **Your Lambda function must use one of the [supported runtimes][lambda-supported-runtimes] for extensions**
+
+#### 1. Configure Vault
 
 First, set up AWS IAM auth on Vault, and attach a policy to your ARN:
 
@@ -68,11 +75,40 @@ vault write auth/aws/role/vault-lambda-role \
     ttl=1h
 ```
 
-Add the extension to your Lambda layers using the console or [cli][lambda-add-layer-cli]:
+#### 2. Option a) Install the extension for Lambda functions packaged in zip archives
+
+If you deploy your Lambda function as a zip file, you can add the extension
+to your Lambda layers using the console or [cli][lambda-add-layer-cli]:
 
 ```text
 arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:8
 ```
+
+#### 2. Option b) Install the extension for Lambda functions packaged in container images
+
+Alternatively, if you deploy your Lambda function as a container image, simply
+place the built binary in the `/opt/extensions` directory of your image. There
+is currently no publicly accessible download location for the pre-built binary.
+
+To build the binary from source:
+
+```bash
+# Requires Golang installed. Run from the root of this repository.
+GOOS=linux GOARCH=amd64 go build -o vault-lambda-extension main.go
+```
+
+Or to fetch the binary from the published AWS Lambda layer:
+
+```bash
+# Requires `curl`, `unzip`, `aws` CLI and authentication for `aws`
+curl $(aws lambda get-layer-version-by-arn --arn arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:8 --query 'Content.Location' --output text --region us-east-1) --output vault-lambda-extension.zip
+unzip vault-lambda-extension.zip
+```
+
+See the [demo-function readme](./quick-start/demo-function/README.md) for a full
+end to end example of deploying functions with extensions in a container image.
+
+#### 3. Configure vault-lambda-extension
 
 Configure the extension using [Lambda environment variables][lambda-env-vars]:
 
@@ -185,6 +221,7 @@ Init latency | 8.5ms (standard deviation 2.4ms) + one network round trip to auth
 Invoke latency | <1ms | The base processing time for each function invocation, assuming no calls to the proxy server | Instrumented in code
 Memory impact | 12MB | The marginal impact on "Max Memory Used" when running the extension | As reported by Lambda when running Hello World function with and without extension
 
+[vault-learn-guide]: https://learn.hashicorp.com/tutorials/vault/aws-lambda
 [vault-aws-iam-auth]: https://www.vaultproject.io/docs/auth/aws
 [vault-env-vars]: https://www.vaultproject.io/docs/commands#environment-variables
 [vault-api-secret-struct]: https://github.com/hashicorp/vault/blob/api/v1.0.4/api/secret.go#L15
