@@ -20,10 +20,11 @@ To use the extension, include the following ARN as a layer in your Lambda functi
 arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:8
 ```
 
-Where region may be any of `ap-northeast-1`, `ap-northeast-2`, `ap-south-1`,
-`ap-southeast-1`, `ap-southeast-2`, `ca-central-1`, `eu-central-1`, `eu-north-1`,
-`eu-west-1`, `eu-west-2`, `eu-west-3`, `sa-east-1`, `us-east-1`, `us-east-2`,
-`us-west-1`, `us-west-2`.
+Where region may be any of `af-south-1`, `ap-east-1`, `ap-northeast-1`,
+`ap-northeast-2`, `ap-northeast-3`, `ap-south-1`, `ap-southeast-1`,
+`ap-southeast-2`, `ca-central-1`, `eu-central-1`, `eu-north-1`, `eu-south-1`,
+`eu-west-1`, `eu-west-2`, `eu-west-3`, `me-south-1`, `sa-east-1`, `us-east-1`,
+`us-east-2`, `us-west-1`, `us-west-2`.
 
 The extension authenticates with Vault using [AWS IAM auth][vault-aws-iam-auth],
 and all configuration is supplied via environment variables. There are two methods
@@ -101,7 +102,8 @@ Or to fetch the binary from the published AWS Lambda layer:
 
 ```bash
 # Requires `curl`, `unzip`, `aws` CLI and authentication for `aws`
-curl $(aws lambda get-layer-version-by-arn --arn arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:8 --query 'Content.Location' --output text --region us-east-1) --output vault-lambda-extension.zip
+curl --silent $(aws lambda get-layer-version-by-arn --arn arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:8 --query 'Content.Location' --output text --region us-east-1) \
+  --output vault-lambda-extension.zip
 unzip vault-lambda-extension.zip
 ```
 
@@ -220,6 +222,21 @@ Layer size | 8.5MB | The size of the unpacked extension binary | `ls -la`
 Init latency | 8.5ms (standard deviation 2.4ms) + one network round trip to authenticate to Vault | Extension initialization time in a new execution environment. Authentication round trip time will be highly deployment-dependent | Instrumented in code
 Invoke latency | <1ms | The base processing time for each function invocation, assuming no calls to the proxy server | Instrumented in code
 Memory impact | 12MB | The marginal impact on "Max Memory Used" when running the extension | As reported by Lambda when running Hello World function with and without extension
+
+## Uploading to your own AWS account and region
+
+If you would like to upload the extension as a Lambda layer in your own AWS
+account and region, you can do the following:
+
+```bash
+curl --silent $(aws lambda get-layer-version-by-arn --arn arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:8 --query 'Content.Location' --output text --region us-east-1) \
+  --output vault-lambda-extension.zip
+export REGION="YOUR REGION HERE"
+aws lambda publish-layer-version \
+  --layer-name vault-lambda-extension \
+  --zip-file  "fileb://vault-lambda-extension.zip" \
+  --region "${REGION}"
+```
 
 [vault-learn-guide]: https://learn.hashicorp.com/tutorials/vault/aws-lambda
 [vault-aws-iam-auth]: https://www.vaultproject.io/docs/auth/aws

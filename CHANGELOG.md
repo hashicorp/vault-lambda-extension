@@ -8,6 +8,7 @@ DOCUMENTATION:
 
 * Added documentation for deploying the extension into `Image` format Lambdas [[GH-34](https://github.com/hashicorp/vault-lambda-extension/pull/34)]
 * Added documentation on performance impact of extension [[GH-35](https://github.com/hashicorp/vault-lambda-extension/pull/35)]
+* Added documentation on uploading the extension into different accounts and regions [[GH-37](https://github.com/hashicorp/vault-lambda-extension/pull/37)]
 
 ## v0.3.0 (March 23rd, 2021)
 
