@@ -2,7 +2,12 @@
 
 FEATURES:
 
-Add `VAULT_STS_ENDPOINT_REGION` to make STS regional endpoint used for auth configurable separately from the region Lambda is deployed in. [[GH-30](https://github.com/hashicorp/vault-lambda-extension/pull/30)]
+* Add `VAULT_STS_ENDPOINT_REGION` environment variable to make STS regional endpoint used for auth configurable separately from the region Lambda is deployed in. [[GH-30](https://github.com/hashicorp/vault-lambda-extension/pull/30)]
+
+DOCUMENTATION:
+
+* Added documentation for deploying the extension into `Image` format Lambdas [[GH-34](https://github.com/hashicorp/vault-lambda-extension/pull/34)]
+* Added documentation on performance impact of extension [[GH-35](https://github.com/hashicorp/vault-lambda-extension/pull/35)]
 
 ## v0.3.0 (March 23rd, 2021)
 
