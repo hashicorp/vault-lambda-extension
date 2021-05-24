@@ -10,8 +10,6 @@ This repository contains the source code for HashiCorp's Vault AWS Lambda extens
 The extension utilizes the AWS Lambda Extensions API to help your Lambda function
 read secrets from your Vault deployment.
 
-**Note: The AWS Lambda Extensions API and this extension are both currently public preview.**
-
 ## Usage
 
 To use the extension, include the following ARN as a layer in your Lambda function:
