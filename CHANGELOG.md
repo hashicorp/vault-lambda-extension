@@ -3,6 +3,7 @@
 FEATURES:
 
 * Add `VAULT_STS_ENDPOINT_REGION` environment variable to make STS regional endpoint used for auth configurable separately from the region Lambda is deployed in. [[GH-30](https://github.com/hashicorp/vault-lambda-extension/pull/30)]
+* Add `VLE_VAULT_ADDR` environment variable to configure Vault address to connect to. Allows clients of the proxy to consume the standard `VAULT_ADDR`. [[GH-41](https://github.com/hashicorp/vault-lambda-extension/pull/41)]
 
 DOCUMENTATION:
 

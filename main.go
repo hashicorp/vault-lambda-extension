@@ -20,14 +20,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/extension"
-	"github.com/hashicorp/vault-lambda-extension/internal/server"
+	"github.com/hashicorp/vault-lambda-extension/internal/proxy"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/api"
 )
 
 const (
-	extensionName        = "vault-lambda-extension"
-	stsEndpointRegionEnv = "VAULT_STS_ENDPOINT_REGION"
+	extensionName = "vault-lambda-extension"
 )
 
 func main() {
@@ -78,23 +77,24 @@ func main() {
 func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (*http.Server, error) {
 	logger.Println("Initialising")
 
-	vaultAddr := os.Getenv(api.EnvVaultAddress)
 	authConfig := config.AuthConfigFromEnv()
-
-	if vaultAddr == "" || authConfig.Provider == "" || authConfig.Role == "" {
-		return nil, errors.New("missing VAULT_ADDR, VAULT_AUTH_PROVIDER or VAULT_AUTH_ROLE environment variables")
-	}
-
 	vaultConfig := api.DefaultConfig()
 	if vaultConfig.Error != nil {
 		return nil, fmt.Errorf("error making default vault config for extension: %w", vaultConfig.Error)
 	}
 
-	region, present := os.LookupEnv(stsEndpointRegionEnv)
+	if authConfig.VaultAddress != "" {
+		vaultConfig.Address = authConfig.VaultAddress
+	}
+
+	if vaultConfig.Address == "" || authConfig.Provider == "" || authConfig.Role == "" {
+		return nil, errors.New("missing VLE_VAULT_ADDR, VAULT_ADDR, VAULT_AUTH_PROVIDER or VAULT_AUTH_ROLE environment variables")
+	}
+
 	var ses *session.Session
-	if present {
+	if authConfig.STSEndpointRegion != "" {
 		ses = session.Must(session.NewSession(&aws.Config{
-			Region:              aws.String(region),
+			Region:              aws.String(authConfig.STSEndpointRegion),
 			STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
 		}))
 	} else {
@@ -121,7 +121,7 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
 	}
-	srv := server.New(logger, client)
+	srv := proxy.New(logger, client)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

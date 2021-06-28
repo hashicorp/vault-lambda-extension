@@ -6,7 +6,7 @@ ifdef CI
 override CI_TEST_ARGS:=--junitfile=$(TEST_RESULTS_DIR)/go-test/results.xml --jsonfile=$(TEST_RESULTS_DIR)/go-test/results.json
 endif
 
-.PHONY: build lint test clean mod
+.PHONY: build lint test clean mod quick-start quick-start-destroy
 
 build: clean
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build \
@@ -30,3 +30,19 @@ clean:
 
 mod:
 	@go mod tidy
+
+quick-start:
+	bash quick-start/build.sh
+	cd quick-start/terraform && \
+		terraform init && \
+		terraform apply -auto-approve
+	aws lambda invoke --function-name vault-lambda-extension-demo-function /dev/null \
+		--cli-binary-format raw-in-base64-out \
+		--log-type Tail \
+		--region us-east-1 \
+		| jq -r '.LogResult' \
+		| base64 --decode
+
+quick-start-destroy:
+	cd quick-start/terraform && \
+		terraform destroy -auto-approve
