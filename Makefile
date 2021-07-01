@@ -6,10 +6,11 @@ ifdef CI
 override CI_TEST_ARGS:=--junitfile=$(TEST_RESULTS_DIR)/go-test/results.xml --jsonfile=$(TEST_RESULTS_DIR)/go-test/results.json
 endif
 
-.PHONY: build lint test clean mod quick-start quick-start-destroy
+.PHONY: build lint test clean mod quick-start quick-start-destroy publish-layer-version
 
 build: clean
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build \
+		-ldflags '-s -w' \
 		-a -o pkg/extensions/vault-lambda-extension \
 		.
 
@@ -26,7 +27,6 @@ test:
 
 clean:
 	-rm -rf pkg
-	mkdir -p pkg/extensions
 
 mod:
 	@go mod tidy
@@ -46,3 +46,13 @@ quick-start:
 quick-start-destroy:
 	cd quick-start/terraform && \
 		terraform destroy -auto-approve
+
+publish-layer-version: build
+	cd pkg && zip -r vault-lambda-extension.zip extensions/
+	aws lambda publish-layer-version \
+		--layer-name "vault-lambda-extension" \
+		--zip-file "fileb://pkg/vault-lambda-extension.zip" \
+		--region "us-east-1" \
+		--no-cli-pager \
+		--output text \
+		--query LayerVersionArn
