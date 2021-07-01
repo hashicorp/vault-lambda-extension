@@ -140,7 +140,8 @@ where to write secrets.
 
 Environment variable              | Description | Required | Example value
 ----------------------------------|-------------|----------|--------------
-`VAULT_ADDR`                      | Vault address to connect to | Yes | `https://x.x.x.x:8200`
+`VLE_VAULT_ADDR`                  | Vault address to connect to. Takes precedence over `VAULT_ADDR` so that clients of the proxy server can be configured using the standard `VAULT_ADDR` | No | `https://x.x.x.x:8200`
+`VAULT_ADDR`                      | Vault address to connect to if `VLE_VAULT_ADDR` is not set. Required if `VLE_VAULT_ADDR` is not set | No | `https://x.x.x.x:8200`
 `VAULT_AUTH_PROVIDER`             | Name of the configured AWS IAM auth route on Vault | Yes | `aws`
 `VAULT_AUTH_ROLE`                 | Vault role to authenticate as | Yes | `lambda-app`
 `VAULT_IAM_SERVER_ID`             | Value to pass to the Vault server via the [`X-Vault-AWS-IAM-Server-ID` HTTP Header for AWS Authentication][vault-iam-server-id-header] | No | `vault.example.com`
