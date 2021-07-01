@@ -97,7 +97,7 @@ curl --silent https://releases.hashicorp.com/vault-lambda-extension/0.4.0/vault-
 unzip vault-lambda-extension.zip
 ```
 
-Optionally, you can verify the integrity of the downloaded zip using the instructions [here](https://www.hashicorp.com/security#:~:text=Release%20Archive%20Checksum%20Verification).
+Optionally, you can verify the integrity of the downloaded zip using the release archive checksum verification instructions [here](https://www.hashicorp.com/security).
 
 Or to build the binary from source:
 
