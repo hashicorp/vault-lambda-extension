@@ -109,11 +109,13 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 
 	var newState string
 	//Leverage Vault helpers for eventual consistency on login
-	client.VaultClient = client.VaultClient.WithResponseCallbacks(api.RecordState(&newState)).WithRequestCallbacks(api.RequireState(newState))
+	client.VaultClient = client.VaultClient.WithResponseCallbacks(api.RecordState(&newState))
 	_, err = client.Token(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error logging in to Vault: %w", err)
 	}
+
+	client.VaultClient = client.VaultClient.WithRequestCallbacks(api.RequireState(newState)).WithResponseCallbacks()
 
 
 	err = writePreconfiguredSecrets(client.VaultClient)
