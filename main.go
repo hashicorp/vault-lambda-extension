@@ -117,7 +117,6 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 
 	client.VaultClient = client.VaultClient.WithRequestCallbacks(api.RequireState(newState)).WithResponseCallbacks()
 
-
 	err = writePreconfiguredSecrets(client.VaultClient)
 	if err != nil {
 		return nil, err
