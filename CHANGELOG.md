@@ -1,5 +1,9 @@
 ## Unreleased
 
+FEATURES:
+
+* Use client-controlled consistency when writing secrets to disk to reliably support performance standbys/replicas. [[GH-47](https://github.com/hashicorp/vault-lambda-extension/pull/47)]
+
 ## 0.4.0 (July 1, 2021)
 
 FEATURES:
