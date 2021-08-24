@@ -15,7 +15,7 @@ read secrets from your Vault deployment.
 To use the extension, include the following ARN as a layer in your Lambda function:
 
 ```text
-arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:10
+arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:11
 ```
 
 Where region may be any of `af-south-1`, `ap-east-1`, `ap-northeast-1`,
@@ -80,7 +80,7 @@ If you deploy your Lambda function as a zip file, you can add the extension
 to your Lambda layers using the console or [cli][lambda-add-layer-cli]:
 
 ```text
-arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:10
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:11
 ```
 
 #### 2. Option b) Install the extension for Lambda functions packaged in container images
@@ -92,7 +92,7 @@ Fetch the binary from releases.hashicorp.com:
 
 ```bash
 # Requires `curl` and `unzip`
-curl --silent https://releases.hashicorp.com/vault-lambda-extension/0.4.0/vault-lambda-extension_0.4.0_linux_amd64.zip \
+curl --silent https://releases.hashicorp.com/vault-lambda-extension/0.5.0/vault-lambda-extension_0.5.0_linux_amd64.zip \
   --output vault-lambda-extension.zip
 unzip vault-lambda-extension.zip
 ```
@@ -229,7 +229,7 @@ If you would like to upload the extension as a Lambda layer in your own AWS
 account and region, you can do the following:
 
 ```bash
-curl --silent https://releases.hashicorp.com/vault-lambda-extension/0.4.0/vault-lambda-extension_0.4.0_linux_amd64.zip \
+curl --silent https://releases.hashicorp.com/vault-lambda-extension/0.5.0/vault-lambda-extension_0.5.0_linux_amd64.zip \
   --output vault-lambda-extension.zip
 export REGION="YOUR REGION HERE"
 aws lambda publish-layer-version \
