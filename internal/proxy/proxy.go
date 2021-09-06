@@ -2,14 +2,14 @@ package proxy
 
 import (
 	"fmt"
-	"github.com/hashicorp/vault-lambda-extension/internal/vault"
-	"github.com/hashicorp/vault/sdk/helper/consts"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-)
 
+	"github.com/hashicorp/vault-lambda-extension/internal/vault"
+	"github.com/hashicorp/vault/sdk/helper/consts"
+)
 
 // New returns an unstarted HTTP server with health and proxy handlers.
 func New(logger *log.Logger, client *vault.Client) *http.Server {
@@ -33,7 +33,7 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 				Path: r.URL.Path,
 			})
 			if ok {
-				logger.Printf("Cache hit for: GET %s", r.URL.Path)
+				logger.Printf("Cache hit for: %s %s", r.Method, r.URL.Path)
 				fetchFromCache(w, data)
 				return
 			}
@@ -58,31 +58,33 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 			return
 		}
 
-		headers := w.Header()
-		for k, vv := range resp.Header {
-			for _, v := range vv {
-				headers.Add(k, v)
-			}
-		}
-		w.WriteHeader(resp.StatusCode)
 		defer resp.Body.Close()
-		_, err = io.Copy(w, resp.Body)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to write response back to requester: %s", err), http.StatusInternalServerError)
-			return
-		}
-		logger.Printf("Successfully proxied %s %s\n", r.Method, r.URL.Path)
 
 		if shallRefreshCache(r, cache) {
 			data := retrieveData(resp)
+
 			cache.Set(CacheKey {
 				Path: r.URL.Path,
-			}, data) // also cache errors
+			}, data)
+
+			logger.Printf("Refresh cache for: %s %s", r.Method, r.URL.Path)
+
+			fetchFromCache(w, data)
+
+		} else {
+			copyHeaders(w.Header(), resp.Header)
+			w.WriteHeader(resp.StatusCode)
+			
+			_, err = io.Copy(w, resp.Body)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to write response back to requester: %s", err), http.StatusInternalServerError)
+				return
+			}
 		}
+
+		logger.Printf("Successfully proxied %s %s\n", r.Method, r.URL.Path)
 	}
 }
-
-
 
 func proxyRequest(r *http.Request, vaultAddress string, token string) (*http.Request, error) {
 	// http.Transport will transparently request gzip and decompress the response, but only if
@@ -107,6 +109,3 @@ func proxyRequest(r *http.Request, vaultAddress string, token string) (*http.Req
 
 	return fwReq, nil
 }
-
-
-

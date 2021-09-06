@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -64,9 +65,6 @@ func (c *Cache) Remove(key CacheKey) {
 }
 
 func copyHeaders(dst, src http.Header) {
-	for k, _ := range dst {
-		dst.Del(k)
-	}
 	for k, vs := range src {
 		for _, v := range vs {
 			dst.Add(k, v)
@@ -78,7 +76,7 @@ func setupCache() *Cache {
 	cacheTTLEnv := os.Getenv(vaultCacheTTL)
 	if cacheTTLEnv != "" {
 		cacheTTL, err := time.ParseDuration(cacheTTLEnv)
-		if err != nil && cacheTTL > 0 {
+		if err == nil && cacheTTL > 0 {
 			return NewCache(cacheTTL)
 		}
 	}
@@ -117,8 +115,10 @@ func retrieveData(resp *http.Response) CacheData {
 	var buf bytes.Buffer
 	_, err := io.Copy(&buf, resp.Body)
 	if err != nil {
-		data.StatusCode = http.StatusInternalServerError
+		data.StatusCode = http.StatusInternalServerError // also cache errors
+		data.Body = []byte(fmt.Sprintf("failed to write response back to requester: %s", err))
+	} else {
+		data.Body = buf.Bytes()
 	}
-	data.Body = buf.Bytes()
 	return data
 }
