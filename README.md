@@ -191,11 +191,11 @@ See documentation on [`sts_regional_endpoints`][lambda-sts-regional-endpoints] f
 
 ### Caching
 
-Caching can be configured for the local proxy server so that it does not forward every request to Vault. To turn on caching, set VAULT_CACHE_TTL to a valid time duration in Go, for example, "15m", "1h", "2m3s" or "1h2m3s". An invalid value will be treated the same as a missing value, in which case, caching will not be set up. 
+Caching can be configured for the local proxy server so that it does not forward every HTTP request to retrieve secrets to Vault. To turn on caching, set VAULT_CACHE_TTL to a valid time duration in Go, for example, "15m", "1h", "2m3s" or "1h2m3s", depending on application needs. An invalid value will be treated the same as a missing value, in which case, caching will not be set up and enabled. 
 
-Only requests with HTTP method of "GET", and a query parameter of "cacheable" with value of "1" will be cached at the proxy server. Cached value will be returned when the same GET call is made to the same request URL path, that is, to simplify, the current behavior uses request URL path to be the only criteria whether a cache is hit or not, which can be enhanced if other criteria are necessary, for example, query parameters or headers.
+Only requests with HTTP method of "GET", and a query parameter of "cacheable" with value of "1" will be cached at the proxy server. Cached value will be returned when the same request is made, without making another HTTP request to Vault. To simplify, the current behavior uses request URL path and query parameter of "version" as criteria over whether a cache is hit or not, which can be enhanced if other criteria are necessary, for example, other query parameters or headers. The main consideration behind caching design is to cache only secrets and only optionally for desirable scenarios depending on application needs, and forward all other HTTP requests to Vault. 
 
-You can always override caching and forward a request to Vault, for example in the case of secrets may expire, by using a query parameter of "recache" with value of "1". The proxy server will also refresh its cache so that a later hit can retrieve the newer secrets.
+You can always override caching and forward a request to Vault, for example in the case of expired secrets, by using a query parameter of "recache" with value of "1", together with a query parameter of "cacheable" with value of "1". The proxy server will refresh its cache so that a later hit can retrieve the newer secrets.
 
 ## Limitations
 
