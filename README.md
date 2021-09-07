@@ -170,6 +170,7 @@ Environment variable    | Description | Required | Example value
 `VAULT_TLS_SERVER_NAME` | Name to use as the SNI host when connecting via TLS | No | `vault.example.com`
 `VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details. Ignored by proxy server | No | `10`
 `VAULT_NAMESPACE`       | The namespace to use for pre-configured secrets. Ignored by proxy server | No | `education`
+`VAULT_CACHE_TTL`       | The time to live configuration (aka, TTL) of the cache used by proxy server. | No | `15m`
 
 ### AWS STS client configuration
 
@@ -187,6 +188,14 @@ Then you may need to configure the extension's STS client to also use the region
 STS endpoint by setting `AWS_STS_REGIONAL_ENDPOINTS=regional`, because both the AWS Golang
 SDK and Vault IAM auth method default to using the global endpoint in many regions.
 See documentation on [`sts_regional_endpoints`][lambda-sts-regional-endpoints] for more information.
+
+### Caching
+
+Caching can be configured for the local proxy server so that it does not forward every request to Vault. To turn on caching, set VAULT_CACHE_TTL to a valid time duration in Go, for example, "15m", "1h", "2m3s" or "1h2m3s". An invalid value will be treated the same as a missing value, in which case, caching will not be set up. 
+
+Only requests with HTTP method of "GET", and a query parameter of "cacheable" with value of "1" will be cached at the proxy server. Cached value will be returned when the same GET call is made to the same request URL path, that is, to simplify, the current behavior uses request URL path to be the only criteria whether a cache is hit or not, which can be enhanced if other criteria are necessary, for example, query parameters or headers.
+
+You can always override caching and forward a request to Vault, for example in the case of secrets may expire, by using a query parameter of "recache" with value of "1". The proxy server will also refresh its cache so that a later hit can retrieve the newer secrets.
 
 ## Limitations
 
