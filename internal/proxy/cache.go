@@ -14,6 +14,7 @@ const (
 	vaultCacheTTL    = "VAULT_CACHE_TTL"
 	queryParameterCacheable = "cacheable"
 	queryParameterRecache = "recache"
+	queryParameterVersion = "version"
 )
 
 type Cache struct {
@@ -24,6 +25,7 @@ type Cache struct {
 
 type CacheKey struct {
 	Path   string
+	Version string
 }
 
 type CacheData struct {

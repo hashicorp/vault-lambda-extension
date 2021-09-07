@@ -31,6 +31,7 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 		if shallFetchCache(r, cache) {
 			data, ok := cache.Get(CacheKey {
 				Path: r.URL.Path,
+				Version: r.URL.Query().Get(queryParameterVersion),
 			})
 			if ok {
 				logger.Printf("Cache hit for: %s %s", r.Method, r.URL.Path)
@@ -65,6 +66,7 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 
 			cache.Set(CacheKey {
 				Path: r.URL.Path,
+				Version: r.URL.Query().Get(queryParameterVersion),
 			}, data)
 
 			logger.Printf("Refresh cache for: %s %s", r.Method, r.URL.Path)
