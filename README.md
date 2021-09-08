@@ -170,7 +170,7 @@ Environment variable    | Description | Required | Example value
 `VAULT_TLS_SERVER_NAME` | Name to use as the SNI host when connecting via TLS | No | `vault.example.com`
 `VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details. Ignored by proxy server | No | `10`
 `VAULT_NAMESPACE`       | The namespace to use for pre-configured secrets. Ignored by proxy server | No | `education`
-`VAULT_CACHE_TTL`       | The time to live configuration (aka, TTL) of the cache used by proxy server. | No | `15m`
+`VAULT_CACHE_TTL`       | The time to live configuration (aka, TTL) of the cache used by proxy server. Must have a unit and be parseable by time.Duration. | No | `15m`
 
 ### AWS STS client configuration
 
@@ -191,11 +191,11 @@ See documentation on [`sts_regional_endpoints`][lambda-sts-regional-endpoints] f
 
 ### Caching
 
-Caching can be configured for the local proxy server so that it does not forward every HTTP request to retrieve secrets to Vault. To turn on caching, set VAULT_CACHE_TTL to a valid time duration in Go, for example, "15m", "1h", "2m3s" or "1h2m3s", depending on application needs. An invalid value will be treated the same as a missing value, in which case, caching will not be set up and enabled. 
+Caching can be configured for the extension's local proxy server so that it does not forward every HTTP request to Vault. To turn on caching, set VAULT_CACHE_TTL to a valid value that is parseable by time.Duration in Go, for example, "15m", "1h", "2m3s" or "1h2m3s", depending on application needs. An invalid or negative value will be treated the same as a missing value, in which case, caching will not be set up and enabled.
 
-Only requests with HTTP method of "GET", and a query parameter of "cacheable" with value of "1" will be cached at the proxy server. Cached value will be returned when the same request is made, without making another HTTP request to Vault. To simplify, the current behavior uses request URL path and query parameter of "version" as criteria over whether a cache is hit or not, which can be enhanced if other criteria are necessary, for example, other query parameters or headers. The main consideration behind caching design is to cache only secrets and only optionally for desirable scenarios depending on application needs, and forward all other HTTP requests to Vault. 
+Only requests with HTTP method of "GET", and a query parameter of "cacheable" with value of "1" will be cached at the proxy server. Cached value will be returned when the same request is made, without making another HTTP request to Vault. To simplify, the current behavior uses request URL path and value of query parameter of "version" as criteria over whether a cache is hit or not. The main consideration behind caching design is to cache only static secrets and only optionally for desirable scenarios depending on application needs, and forward all other HTTP requests to Vault.
 
-You can always override caching and forward a request to Vault, for example in the case of expired secrets, by using a query parameter of "recache" with value of "1", together with a query parameter of "cacheable" with value of "1". The proxy server will refresh its cache so that a later hit can retrieve the newer secrets.
+You can always override caching and forward a request to Vault, for example in the case of expired secrets, by using a query parameter of "recache" with value of "1", together with a query parameter of "cacheable" with value of "1". The proxy server will forward the request to Vault and refresh its cache with response so that a later hit can retrieve the newer secrets.
 
 ## Limitations
 
