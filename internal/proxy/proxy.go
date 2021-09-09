@@ -29,8 +29,8 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		if shallFetchCache(r, cache) {
-			data, ok := cache.Get(CacheKey {
-				Path: r.URL.Path,
+			data, ok := cache.Get(CacheKey{
+				Path:    r.URL.Path,
 				Version: r.URL.Query().Get(queryParameterVersion),
 			})
 			if ok {
@@ -64,8 +64,8 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 		if shallRefreshCache(r, cache) {
 			data := retrieveData(resp)
 
-			cache.Set(CacheKey {
-				Path: r.URL.Path,
+			cache.Set(CacheKey{
+				Path:    r.URL.Path,
 				Version: r.URL.Query().Get(queryParameterVersion),
 			}, data)
 
@@ -76,7 +76,7 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 		} else {
 			copyHeaders(w.Header(), resp.Header)
 			w.WriteHeader(resp.StatusCode)
-			
+
 			_, err = io.Copy(w, resp.Body)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to write response back to requester: %s", err), http.StatusInternalServerError)

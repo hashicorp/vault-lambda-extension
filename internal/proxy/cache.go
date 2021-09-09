@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	vaultCacheTTL    = "VAULT_CACHE_TTL"
+	vaultCacheTTL           = "VAULT_CACHE_TTL"
 	queryParameterCacheable = "cacheable"
-	queryParameterRecache = "recache"
-	queryParameterVersion = "version"
+	queryParameterRecache   = "recache"
+	queryParameterVersion   = "version"
 )
 
 type Cache struct {
@@ -24,7 +24,7 @@ type Cache struct {
 }
 
 type CacheKey struct {
-	Path   string
+	Path    string
 	Version string
 }
 
@@ -87,7 +87,7 @@ func setupCache() *Cache {
 
 func shallFetchCache(r *http.Request, cache *Cache) bool {
 	if cache == nil {
-		return  false
+		return false
 	}
 	cacheable := r.URL.Query().Get(queryParameterCacheable)
 	recache := r.URL.Query().Get(queryParameterRecache)
@@ -96,7 +96,7 @@ func shallFetchCache(r *http.Request, cache *Cache) bool {
 
 func shallRefreshCache(r *http.Request, cache *Cache) bool {
 	if cache == nil {
-		return  false
+		return false
 	}
 	cacheable := r.URL.Query().Get(queryParameterCacheable)
 	return r.Method == "GET" && cacheable == "1"
@@ -107,7 +107,6 @@ func fetchFromCache(w http.ResponseWriter, data CacheData) {
 	w.WriteHeader(data.StatusCode)
 	w.Write(data.Body)
 }
-
 
 func retrieveData(resp *http.Response) CacheData {
 	var data CacheData
