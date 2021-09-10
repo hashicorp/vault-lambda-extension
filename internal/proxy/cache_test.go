@@ -56,7 +56,7 @@ func TestShallFetchCache(t *testing.T) {
 		cacheableValue := "1"
 		r := httptest.NewRequest("GET", "/v1/uuid/s1?cacheable="+cacheableValue, nil)
 		shallFetch := shallFetchCache(r, cache)
-		require.Truef(t, shallFetch,`shallFetchCache() shall return true when cacheable is: %s`, cacheableValue)
+		require.Truef(t, shallFetch, `shallFetchCache() shall return true when cacheable is: %s`, cacheableValue)
 	})
 	t.Run("Shall not fetch from cache when cache is nil", func(t *testing.T) {
 		cacheableValue := "1"
