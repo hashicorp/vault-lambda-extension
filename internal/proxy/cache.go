@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	vaultCacheTTL           = "VAULT_CACHE_TTL"
+	vaultDefaultCacheTTL    = "VAULT_DEFAULT_CACHE_TTL"
 	queryParameterCacheable = "cacheable"
 	queryParameterRecache   = "recache"
 	queryParameterVersion   = "version"
@@ -75,7 +75,7 @@ func copyHeaders(dst, src http.Header) {
 }
 
 func setupCache() *Cache {
-	cacheTTLEnv := os.Getenv(vaultCacheTTL)
+	cacheTTLEnv := os.Getenv(vaultDefaultCacheTTL)
 	if cacheTTLEnv != "" {
 		cacheTTL, err := time.ParseDuration(cacheTTLEnv)
 		if err == nil && cacheTTL > 0 {
