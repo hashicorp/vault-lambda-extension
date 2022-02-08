@@ -3,7 +3,6 @@ package proxy
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCache(t *testing.T) {
@@ -22,7 +23,7 @@ func TestSetupCache(t *testing.T) {
 	t.Run("Valid vault cache TTL shall set up and return cache successfully", func(t *testing.T) {
 		ttlArray := []string{"15m", "2s", "1h3m", "0h2m3s", "1h2m3s", "15s"}
 		for _, ttl := range ttlArray {
-			os.Setenv(vaultCacheTTL, ttl)
+			os.Setenv(vaultDefaultCacheTTL, ttl)
 			cache := setupCache()
 			require.NotNilf(t, cache, `setupCache() returns nil with env variable: %s`, ttl)
 		}
@@ -31,7 +32,7 @@ func TestSetupCache(t *testing.T) {
 	t.Run("Invalid vault cache TTL shall fail to set up and return cache", func(t *testing.T) {
 		ttlArray := []string{"15sm", "2st", "1h3m5t", "-0h2m3s", "15", "-15s"}
 		for _, ttl := range ttlArray {
-			os.Setenv(vaultCacheTTL, ttl)
+			os.Setenv(vaultDefaultCacheTTL, ttl)
 			cache := setupCache()
 			require.Nilf(t, cache, `setupCache() does not return nil with env variable: %s`, ttl)
 		}
