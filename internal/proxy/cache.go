@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	vaultCacheTTL           = "VAULT_CACHE_TTL"
+	vaultCacheTTL           = "VAULT_DEFAULT_CACHE_TTL"
 	queryParameterCacheable = "cacheable"
 	queryParameterRecache   = "recache"
 	queryParameterVersion   = "version"

@@ -170,7 +170,7 @@ Environment variable    | Description | Required | Example value
 `VAULT_TLS_SERVER_NAME` | Name to use as the SNI host when connecting via TLS | No | `vault.example.com`
 `VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details. Ignored by proxy server | No | `10`
 `VAULT_NAMESPACE`       | The namespace to use for pre-configured secrets. Ignored by proxy server | No | `education`
-`VAULT_CACHE_TTL`       | The time to live configuration (aka, TTL) of the cache used by proxy server. Must have a unit and be parseable by time.Duration. | No | `15m`
+`VAULT_DEFAULT_CACHE_TTL` | The time to live configuration (aka, TTL) of the cache used by proxy server. Must have a unit and be parseable by time.Duration. | No | `15m`
 
 ### AWS STS client configuration
 
@@ -191,7 +191,7 @@ See documentation on [`sts_regional_endpoints`][lambda-sts-regional-endpoints] f
 
 ### Caching
 
-Caching can be configured for the extension's local proxy server so that it does not forward every HTTP request to Vault. To turn on caching, set VAULT_CACHE_TTL to a valid value that is parseable by time.Duration in Go, for example, "15m", "1h", "2m3s" or "1h2m3s", depending on application needs. An invalid or negative value will be treated the same as a missing value, in which case, caching will not be set up and enabled.
+Caching can be configured for the extension's local proxy server so that it does not forward every HTTP request to Vault. To turn on caching, set VAULT_DEFAULT_CACHE_TTL to a valid value that is parseable by time.Duration in Go, for example, "15m", "1h", "2m3s" or "1h2m3s", depending on application needs. An invalid or negative value will be treated the same as a missing value, in which case, caching will not be set up and enabled.
 
 Only requests with HTTP method of "GET", and a query parameter of "cacheable" with value of "1" will be cached at the proxy server. Cached value will be returned when the same request is made, without making another call to Vault. Currently, the cache key is composed of the request's URL path and its "version" query parameter value. The main consideration behind caching design is to make caching an explicit opt-in at the request level, so that it is only enabled for scenarios where caching makes sense without negative impact over others.
 
