@@ -2,12 +2,18 @@ package proxy
 
 import (
 	"bytes"
+	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
-	"sync"
 	"time"
+
+	"github.com/hashicorp/vault/sdk/helper/cryptoutil"
+	gocache "github.com/patrickmn/go-cache"
 )
 
 const (
@@ -18,52 +24,103 @@ const (
 )
 
 type Cache struct {
-	mu      sync.RWMutex
-	data    map[CacheKey]CacheData
+	data    *gocache.Cache
 	timeout time.Duration
 }
 
 type CacheKey struct {
-	Path    string
-	Version string
+	Token       string
+	Request     *http.Request
+	RequestBody []byte
 }
 
 type CacheData struct {
 	StatusCode int
 	Header     http.Header
 	Body       []byte
-	expires    time.Time
 }
 
 func NewCache(timeout time.Duration) *Cache {
 	return &Cache{
-		data:    make(map[CacheKey]CacheData),
+		data:    gocache.New(timeout, timeout),
 		timeout: timeout,
 	}
 }
 
-func (c *Cache) Set(key CacheKey, data CacheData) {
-	data.expires = time.Now().Add(c.timeout)
-	c.mu.Lock()
-	c.data[key] = data
-	c.mu.Unlock()
-}
-
-func (c *Cache) Get(key CacheKey) (data CacheData, ok bool) {
-	c.mu.RLock()
-	data, ok = c.data[key]
-	c.mu.RUnlock()
-	if ok && time.Now().After(data.expires) {
-		ok = false
-		c.Remove(key)
+// constructs the CacheKey for this request and token and returns the SHA256
+// hash
+func makeRequestHash(logger *log.Logger, r *http.Request, token string) (string, error) {
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read request body: %w", err)
 	}
-	return
+	if r.Body != nil {
+		r.Body.Close()
+	}
+	r.Body = ioutil.NopCloser(bytes.NewReader(reqBody))
+	cacheKey := &CacheKey{
+		Token:       token,
+		Request:     r,
+		RequestBody: reqBody,
+	}
+
+	cacheKeyHash, err := computeRequestID(cacheKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to compute request hash")
+	}
+	return cacheKeyHash, nil
 }
 
-func (c *Cache) Remove(key CacheKey) {
-	c.mu.Lock()
-	delete(c.data, key)
-	c.mu.Unlock() // defer is a bit slower then explicit call
+// computeRequestID results in a value that uniquely identifies a request
+// received by the proxy. It does so by SHA256 hashing the serialized request
+// object containing the request path, query parameters and body parameters.
+func computeRequestID(key *CacheKey) (string, error) {
+	var b bytes.Buffer
+
+	if key == nil || key.Request == nil {
+		return "", fmt.Errorf("cache key is nil")
+	}
+
+	cloned := key.Request.Clone(context.Background())
+	cloned.Header.Del("X-Vault-Index")
+	cloned.Header.Del("X-Vault-Forward")
+	cloned.Header.Del("X-Vault-Inconsistent")
+	// Serialize the request
+	if err := cloned.Write(&b); err != nil {
+		return "", fmt.Errorf("failed to serialize request: %v", err)
+	}
+
+	// Reset the request body after it has been closed by Write
+	key.Request.Body = ioutil.NopCloser(bytes.NewReader(key.RequestBody))
+
+	// Append key.Token into the byte slice. Just in case the token was only
+	// passed directly in CacheKey.Token, and not in a header.
+	if _, err := b.Write([]byte(key.Token)); err != nil {
+		return "", fmt.Errorf("failed to write token to hash input: %w", err)
+	}
+
+	return hex.EncodeToString(cryptoutil.Blake2b256Hash(b.String())), nil
+}
+
+func (c *Cache) Set(keyStr string, data *CacheData) {
+	c.data.Set(keyStr, data, gocache.DefaultExpiration)
+}
+
+func (c *Cache) Get(keyStr string) (data *CacheData, err error) {
+	dataRaw, found := c.data.Get(keyStr)
+	if found && dataRaw != nil {
+		var ok bool
+		data, ok = dataRaw.(*CacheData)
+		if !ok {
+			return nil, fmt.Errorf("failed to convert cache item to CacheData for key %v", keyStr)
+		}
+	}
+
+	return data, nil
+}
+
+func (c *Cache) Remove(keyStr string) {
+	c.data.Delete(keyStr)
 }
 
 func copyHeaders(dst, src http.Header) {
@@ -102,14 +159,14 @@ func shallRefreshCache(r *http.Request, cache *Cache) bool {
 	return r.Method == "GET" && cacheable == "1"
 }
 
-func fetchFromCache(w http.ResponseWriter, data CacheData) {
+func fetchFromCache(w http.ResponseWriter, data *CacheData) {
 	copyHeaders(w.Header(), data.Header)
 	w.WriteHeader(data.StatusCode)
 	w.Write(data.Body)
 }
 
-func retrieveData(resp *http.Response) CacheData {
-	var data CacheData
+func retrieveData(resp *http.Response) *CacheData {
+	data := &CacheData{}
 	data.StatusCode = resp.StatusCode
 	data.Header = resp.Header
 
