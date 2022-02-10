@@ -133,3 +133,11 @@ func proxyRequest(r *http.Request, vaultAddress string, token string) (*http.Req
 
 	return fwReq, nil
 }
+
+func copyHeaders(dst, src http.Header) {
+	for k, vs := range src {
+		for _, v := range vs {
+			dst.Add(k, v)
+		}
+	}
+}

@@ -135,14 +135,6 @@ func (c *Cache) Remove(keyStr string) {
 	c.data.Delete(keyStr)
 }
 
-func copyHeaders(dst, src http.Header) {
-	for k, vs := range src {
-		for _, v := range vs {
-			dst.Add(k, v)
-		}
-	}
-}
-
 func setupCache() *Cache {
 	cacheTTLEnv := os.Getenv(vaultCacheTTL)
 	if cacheTTLEnv != "" {
@@ -154,19 +146,19 @@ func setupCache() *Cache {
 	return nil
 }
 
-func setCacheOptions(cacheControlHeader string, options *CacheOptions) {
+func parseCacheOptions(cacheControlHeader string) *CacheOptions {
 	values := strings.Split(cacheControlHeader, ",")
-	options.cacheable = strutil.StrListContains(values, headerOptionCacheable)
-	options.recache = strutil.StrListContains(values, headerOptionRecache)
+	return &CacheOptions{
+		cacheable: strutil.StrListContains(values, headerOptionCacheable),
+		recache:   strutil.StrListContains(values, headerOptionRecache),
+	}
 }
 
 func shallFetchCache(r *http.Request, cache *Cache) bool {
 	if cache == nil {
 		return false
 	}
-	cacheControl := r.Header.Get(VaultCacheControlHeaderName)
-	options := &CacheOptions{}
-	setCacheOptions(cacheControl, options)
+	options := parseCacheOptions(r.Header.Get(VaultCacheControlHeaderName))
 	cacheable := options.cacheable && !options.recache
 	return r.Method == http.MethodGet && cacheable
 }
@@ -175,11 +167,9 @@ func shallRefreshCache(r *http.Request, cache *Cache) bool {
 	if cache == nil {
 		return false
 	}
-	cacheControl := r.Header.Get(VaultCacheControlHeaderName)
-	options := &CacheOptions{}
-	setCacheOptions(cacheControl, options)
+	options := parseCacheOptions(r.Header.Get(VaultCacheControlHeaderName))
 	cacheable := options.cacheable || options.recache
-	return r.Method == "GET" && cacheable
+	return r.Method == http.MethodGet && cacheable
 }
 
 func fetchFromCache(w http.ResponseWriter, data *CacheData) {
