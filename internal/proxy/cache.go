@@ -10,17 +10,23 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/vault/sdk/helper/cryptoutil"
+	"github.com/hashicorp/vault/sdk/helper/strutil"
 	gocache "github.com/patrickmn/go-cache"
 )
 
 const (
-	vaultCacheTTL           = "VAULT_DEFAULT_CACHE_TTL"
-	queryParameterCacheable = "cacheable"
-	queryParameterRecache   = "recache"
-	queryParameterVersion   = "version"
+	vaultCacheTTL = "VAULT_DEFAULT_CACHE_TTL"
+
+	// Return a cached response if it exists, otherwise fall back to Vault and
+	// cache the response
+	headerOptionCacheable = "cache"
+
+	// Send the request to Vault and cache the response
+	headerOptionRecache = "recache"
 )
 
 type Cache struct {
@@ -38,6 +44,11 @@ type CacheData struct {
 	StatusCode int
 	Header     http.Header
 	Body       []byte
+}
+
+type CacheOptions struct {
+	cacheable bool
+	recache   bool
 }
 
 func NewCache(timeout time.Duration) *Cache {
@@ -82,9 +93,10 @@ func computeRequestID(key *CacheKey) (string, error) {
 	}
 
 	cloned := key.Request.Clone(context.Background())
-	cloned.Header.Del("X-Vault-Index")
-	cloned.Header.Del("X-Vault-Forward")
-	cloned.Header.Del("X-Vault-Inconsistent")
+	cloned.Header.Del(VaultIndexHeaderName)
+	cloned.Header.Del(VaultForwardHeaderName)
+	cloned.Header.Del(VaultInconsistentHeaderName)
+	cloned.Header.Del(VaultCacheControlHeaderName)
 	// Serialize the request
 	if err := cloned.Write(&b); err != nil {
 		return "", fmt.Errorf("failed to serialize request: %v", err)
@@ -142,21 +154,32 @@ func setupCache() *Cache {
 	return nil
 }
 
+func setCacheOptions(cacheControlHeader string, options *CacheOptions) {
+	values := strings.Split(cacheControlHeader, ",")
+	options.cacheable = strutil.StrListContains(values, headerOptionCacheable)
+	options.recache = strutil.StrListContains(values, headerOptionRecache)
+}
+
 func shallFetchCache(r *http.Request, cache *Cache) bool {
 	if cache == nil {
 		return false
 	}
-	cacheable := r.URL.Query().Get(queryParameterCacheable)
-	recache := r.URL.Query().Get(queryParameterRecache)
-	return r.Method == "GET" && cacheable == "1" && recache != "1"
+	cacheControl := r.Header.Get(VaultCacheControlHeaderName)
+	options := &CacheOptions{}
+	setCacheOptions(cacheControl, options)
+	cacheable := options.cacheable && !options.recache
+	return r.Method == "GET" && cacheable
 }
 
 func shallRefreshCache(r *http.Request, cache *Cache) bool {
 	if cache == nil {
 		return false
 	}
-	cacheable := r.URL.Query().Get(queryParameterCacheable)
-	return r.Method == "GET" && cacheable == "1"
+	cacheControl := r.Header.Get(VaultCacheControlHeaderName)
+	options := &CacheOptions{}
+	setCacheOptions(cacheControl, options)
+	cacheable := options.cacheable || options.recache
+	return r.Method == "GET" && cacheable
 }
 
 func fetchFromCache(w http.ResponseWriter, data *CacheData) {

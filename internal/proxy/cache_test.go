@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,6 +156,34 @@ func TestCache_computeRequestID_moreTests(t *testing.T) {
 
 		assert.NotEqual(t, cacheKeyHash, cacheKeyHash2)
 	})
+
+	t.Run("cache header does not change hash", func(t *testing.T) {
+		cacheKey := CacheKey{
+			Token: "blue",
+			Request: &http.Request{
+				URL: &url.URL{
+					Path: "test",
+				},
+				Header: http.Header{
+					consts.AuthHeaderName:       []string{"blue"},
+					consts.NamespaceHeaderName:  []string{"namespaced"},
+					VaultCacheControlHeaderName: []string{headerOptionCacheable},
+				},
+			},
+			RequestBody: nil,
+		}
+		cacheKeyHash, err := computeRequestID(&cacheKey)
+		require.NoError(t, err)
+		require.NotEmpty(t, cacheKeyHash)
+
+		// Remove the cache header
+		cacheKey.Request.Header.Del(VaultCacheControlHeaderName)
+		cacheKeyHash2, err := computeRequestID(&cacheKey)
+		require.NoError(t, err)
+		require.NotEmpty(t, cacheKeyHash2)
+
+		assert.Equal(t, cacheKeyHash, cacheKeyHash2)
+	})
 }
 
 func Test_makeRequestHash(t *testing.T) {
@@ -283,66 +312,110 @@ func TestGetAfterSet(t *testing.T) {
 
 func TestShallFetchCache(t *testing.T) {
 	cache := NewCache(10 * time.Second)
-	t.Run("Shall fetch from cache when cacheable is 1 and recache is not 1", func(t *testing.T) {
-		cacheableValue := "1"
-		r := httptest.NewRequest("GET", "/v1/uuid/s1?cacheable="+cacheableValue, nil)
-		shallFetch := shallFetchCache(r, cache)
-		require.Truef(t, shallFetch, `shallFetchCache() shall return true when cacheable is: %s`, cacheableValue)
-	})
-	t.Run("Shall not fetch from cache when cache is nil", func(t *testing.T) {
-		cacheableValue := "1"
-		r := httptest.NewRequest("GET", "/v1/uuid/s1?cacheable="+cacheableValue, nil)
-		shallFetch := shallFetchCache(r, nil)
-		require.Falsef(t, shallFetch, `shallFetchCache() shall return false when cache is nil`)
-	})
-	t.Run("Shall not fetch from cache when cacheable is not 1", func(t *testing.T) {
-		cacheableValueArray := []string{"0", "2", "", "-", "10", "-1"}
-		for _, cacheableValue := range cacheableValueArray {
-			r := httptest.NewRequest("GET", "/v1/uuid/s1?cacheable="+cacheableValue, nil)
-			shallFetch := shallFetchCache(r, cache)
-			require.Falsef(t, shallFetch, `shallFetchCache() shall not return true when cacheable is: %s`, cacheableValue)
-		}
-	})
-	t.Run("Shall not fetch from cache when cacheable is 1 and recache is  1", func(t *testing.T) {
-		recacheValue := "1"
-		r := httptest.NewRequest("GET", "/v1/uuid/s1?cacheable=1&recache="+recacheValue, nil)
-		shallFetch := shallFetchCache(r, cache)
-		require.Falsef(t, shallFetch, `shallFetchCache() shall return false when recache is: %s`, recacheValue)
-	})
-	t.Run("Shall not fetch from cache when http method is not GET", func(t *testing.T) {
-		httpMethod := "POST"
-		r := httptest.NewRequest(httpMethod, "/v1/uuid/s1?cacheable=1", nil)
-		shallFetch := shallFetchCache(r, cache)
-		require.Falsef(t, shallFetch, `shallFetchCache() shall not return true when HTTP method is: %s`, httpMethod)
-	})
+	tests := map[string]struct {
+		cache        *Cache
+		cacheControl string
+		method       string
+		expected     bool
+	}{
+		"Shall fetch from cache when cache-control header is 'cache'": {
+			cache:        cache,
+			cacheControl: headerOptionCacheable,
+			method:       http.MethodGet,
+			expected:     true,
+		},
+		"Shall not fetch from cache when cache is nil": {
+			cache:        nil,
+			cacheControl: headerOptionCacheable,
+			method:       http.MethodGet,
+			expected:     false,
+		},
+		"Shall not fetch from cache when cache-control header is incorrect": {
+			cache:        cache,
+			cacheControl: "crash,cache.,cache=1,cache=true",
+			method:       http.MethodGet,
+			expected:     false,
+		},
+		"Shall not fetch from cache when cache-control is 'recache'": {
+			cache:        cache,
+			cacheControl: headerOptionRecache,
+			method:       http.MethodGet,
+			expected:     false,
+		},
+		"Shall not fetch from cache when http method is not GET": {
+			cache:        cache,
+			cacheControl: headerOptionCacheable,
+			method:       http.MethodPost,
+			expected:     false,
+		},
+		"Shall not refresh cache when cache-control header is empty": {
+			cache:        cache,
+			cacheControl: "",
+			method:       http.MethodGet,
+			expected:     false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := httptest.NewRequest(tc.method, "/v1/uuid/s1", nil)
+			r.Header.Set(VaultCacheControlHeaderName, tc.cacheControl)
+			shallFetch := shallFetchCache(r, tc.cache)
+			assert.Equal(t, tc.expected, shallFetch)
+		})
+	}
 }
 
 func TestShallRefreshCache(t *testing.T) {
 	cache := NewCache(10 * time.Second)
-	t.Run("Shall refresh cache when cacheable is 1", func(t *testing.T) {
-		cacheableValue := "1"
-		r := httptest.NewRequest("GET", "/v1/uuid/s1?cacheable="+cacheableValue, nil)
-		shallFetch := shallRefreshCache(r, cache)
-		require.Truef(t, shallFetch, `shallRefreshCache() shall return true when cacheable is: %s`, cacheableValue)
-	})
-	t.Run("Shall not refresh cache when cacheable is nil", func(t *testing.T) {
-		cacheableValue := "1"
-		r := httptest.NewRequest("GET", "/v1/uuid/s1?cacheable="+cacheableValue, nil)
-		shallFetch := shallRefreshCache(r, nil)
-		require.Falsef(t, shallFetch, `shallRefreshCache() shall return false when cache is nil`)
-	})
-	t.Run("Shall not refresh cache when cacheable is not 1", func(t *testing.T) {
-		cacheableValueArray := []string{"0", "2", "", "-", "10", "-1"}
-		for _, cacheableValue := range cacheableValueArray {
-			r := httptest.NewRequest("GET", "/v1/uuid/s1?cacheable="+cacheableValue, nil)
-			shallFetch := shallRefreshCache(r, cache)
-			require.Falsef(t, shallFetch, `shallRefreshCache() shall not return true when cacheable is: %s`, cacheableValue)
-		}
-	})
+	tests := map[string]struct {
+		cache        *Cache
+		cacheControl string
+		expected     bool
+	}{
+		"Shall refresh cache when cache-control header is 'cache'": {
+			cache:        cache,
+			cacheControl: headerOptionCacheable,
+			expected:     true,
+		},
+		"Shall refresh cache when cache-control header is 'recache'": {
+			cache:        cache,
+			cacheControl: headerOptionRecache,
+			expected:     true,
+		},
+		"Shall refresh cache when cache-control header is 'cache,recache'": {
+			cache:        cache,
+			cacheControl: strings.Join([]string{headerOptionCacheable, headerOptionRecache}, ","),
+			expected:     true,
+		},
+		"Shall not refresh cache when cache is nil": {
+			cache:        nil,
+			cacheControl: headerOptionCacheable,
+			expected:     false,
+		},
+		"Shall not refresh cache when cache-control header is incorrect": {
+			cache:        cache,
+			cacheControl: "nope",
+			expected:     false,
+		},
+		"Shall not refresh cache when cache-control header is empty": {
+			cache:        cache,
+			cacheControl: "",
+			expected:     false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := httptest.NewRequest("GET", "/v1/uuid/s1", nil)
+			r.Header.Set(VaultCacheControlHeaderName, tc.cacheControl)
+			shallFetch := shallRefreshCache(r, tc.cache)
+			assert.Equal(t, tc.expected, shallFetch)
+		})
+	}
 }
 
 func TestRetrieveData(t *testing.T) {
-	r := httptest.NewRequest("GET", "/v1/uuid/s1?cacheable=1", nil)
+	r := httptest.NewRequest("GET", "/v1/uuid/s1", nil)
+	r.Header.Set(VaultCacheControlHeaderName, headerOptionCacheable)
 	statusCode := 200
 	body := "Hello World"
 	resp := &http.Response{

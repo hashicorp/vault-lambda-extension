@@ -15,6 +15,7 @@ const (
 	VaultIndexHeaderName        = "X-Vault-Index"
 	VaultInconsistentHeaderName = "X-Vault-Inconsistent"
 	VaultForwardHeaderName      = "X-Vault-Forward"
+	VaultCacheControlHeaderName = "X-Vault-Cache-Control"
 )
 
 // New returns an unstarted HTTP server with health and proxy handlers.
@@ -38,6 +39,7 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 			http.Error(w, fmt.Sprintf("failed to get valid Vault token: %s", err), http.StatusInternalServerError)
 			return
 		}
+
 		logger.Printf("Proxying %s %s\n", r.Method, r.URL.Path)
 		fwReq, err := proxyRequest(r, client.VaultConfig.Address, token)
 		if err != nil {
