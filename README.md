@@ -191,11 +191,27 @@ See documentation on [`sts_regional_endpoints`][lambda-sts-regional-endpoints] f
 
 ### Caching
 
-Caching can be configured for the extension's local proxy server so that it does not forward every HTTP request to Vault. To turn on caching, set VAULT_DEFAULT_CACHE_TTL to a valid value that is parsable by time.Duration in Go, for example, "15m", "1h", "2m3s" or "1h2m3s", depending on application needs. An invalid or negative value will be treated the same as a missing value, in which case, caching will not be set up and enabled.
+Caching can be configured for the extension's local proxy server so that it does
+not forward every HTTP request to Vault. To turn on caching, set
+VAULT_DEFAULT_CACHE_TTL to a valid value that is parsable by time.Duration in
+Go, for example, "15m", "1h", "2m3s" or "1h2m3s", depending on application
+needs. An invalid or negative value will be treated the same as a missing value,
+in which case, caching will not be set up and enabled.
 
-Only requests with HTTP method of "GET", and the HTTP header "X-Vault-Cache-Control" with value of "cache" or "recache" will be cached at the proxy server. With the header set as "X-Vault-Cache-Control: cache", the response will be returned directly from the cache there's a cache hit. Otherwise the request will be forwarded to Vault and the response returned and cached. Currently, the cache key is a hash of the request URL path, headers, body, and token. The main consideration behind caching design is to make caching an explicit opt-in at the request level, so that it is only enabled for scenarios where caching makes sense without negative impact over others.
+Only requests with HTTP method of "GET", and the HTTP header
+"X-Vault-Cache-Control" with value of "cache" or "recache" will be cached at the
+proxy server. With the header set as "X-Vault-Cache-Control: cache", the
+response will be returned directly from the cache there's a cache hit. Otherwise
+the request will be forwarded to Vault and the response returned and cached.
+Currently, the cache key is a hash of the request URL path, headers, body, and
+token. The main consideration behind caching design is to make caching an
+explicit opt-in at the request level, so that it is only enabled for scenarios
+where caching makes sense without negative impact over others.
 
-You can always override caching and forward a request to Vault, for example in the case of expired secrets, set "X-Vault-Cache-Control: recache". The proxy server will forward the request to Vault and refresh its cache with the response so that a later cache hit can retrieve the newer secrets.
+You can always override caching and forward a request to Vault, for example in
+the case of expired secrets, set "X-Vault-Cache-Control: recache". The proxy
+server will forward the request to Vault and refresh its cache with the response
+so that a later cache hit can retrieve the newer secrets.
 
 ## Limitations
 
