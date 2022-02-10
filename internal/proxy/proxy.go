@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	VaultIndexHeaderName        = "X-Vault-Index"
+	VaultCacheControlHeaderName = "X-Vault-Cache-Control"
+
+	// TODO: remove these definitions once they're available in Vault's api package
 	VaultInconsistentHeaderName = "X-Vault-Inconsistent"
 	VaultForwardHeaderName      = "X-Vault-Forward"
-	VaultCacheControlHeaderName = "X-Vault-Cache-Control"
 )
 
 // New returns an unstarted HTTP server with health and proxy handlers.

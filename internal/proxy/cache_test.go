@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/consts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,7 @@ func TestCache_computeRequestID(t *testing.T) {
 						Path: "test",
 					},
 					Header: http.Header{
-						VaultIndexHeaderName:        []string{"foo"},
+						api.HeaderIndex:             []string{"foo"},
 						VaultInconsistentHeaderName: []string{"foo"},
 						VaultForwardHeaderName:      []string{"foo"},
 					},
@@ -91,7 +92,7 @@ func TestCache_computeRequestID_moreTests(t *testing.T) {
 					Path: "test",
 				},
 				Header: http.Header{
-					VaultIndexHeaderName:        []string{"foo"},
+					api.HeaderIndex:             []string{"foo"},
 					VaultInconsistentHeaderName: []string{"foo"},
 					VaultForwardHeaderName:      []string{"foo"},
 				},

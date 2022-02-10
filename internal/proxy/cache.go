@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/cryptoutil"
 	"github.com/hashicorp/vault/sdk/helper/strutil"
 	gocache "github.com/patrickmn/go-cache"
@@ -93,7 +94,7 @@ func computeRequestID(key *CacheKey) (string, error) {
 	}
 
 	cloned := key.Request.Clone(context.Background())
-	cloned.Header.Del(VaultIndexHeaderName)
+	cloned.Header.Del(api.HeaderIndex)
 	cloned.Header.Del(VaultForwardHeaderName)
 	cloned.Header.Del(VaultInconsistentHeaderName)
 	cloned.Header.Del(VaultCacheControlHeaderName)
