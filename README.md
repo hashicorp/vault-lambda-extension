@@ -170,7 +170,7 @@ Environment variable    | Description | Required | Example value
 `VAULT_TLS_SERVER_NAME` | Name to use as the SNI host when connecting via TLS | No | `vault.example.com`
 `VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details. Ignored by proxy server | No | `10`
 `VAULT_NAMESPACE`       | The namespace to use for pre-configured secrets. Ignored by proxy server | No | `education`
-`VAULT_DEFAULT_CACHE_TTL` | The time to live configuration (aka, TTL) of the cache used by proxy server. Must have a unit and be parseable by time.Duration. | No | `15m`
+`VAULT_DEFAULT_CACHE_TTL` | The time to live configuration (aka, TTL) of the cache used by proxy server. Must have a unit and be parsable by time.Duration. | No | `15m`
 
 ### AWS STS client configuration
 

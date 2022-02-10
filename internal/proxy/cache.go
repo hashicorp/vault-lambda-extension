@@ -168,7 +168,7 @@ func shallFetchCache(r *http.Request, cache *Cache) bool {
 	options := &CacheOptions{}
 	setCacheOptions(cacheControl, options)
 	cacheable := options.cacheable && !options.recache
-	return r.Method == "GET" && cacheable
+	return r.Method == http.MethodGet && cacheable
 }
 
 func shallRefreshCache(r *http.Request, cache *Cache) bool {
