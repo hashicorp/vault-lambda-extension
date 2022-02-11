@@ -108,7 +108,7 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 	}
 
 	var newState string
-	//Leverage Vault helpers for eventual consistency on login
+	// Leverage Vault helpers for eventual consistency on login
 	client.VaultClient = client.VaultClient.WithResponseCallbacks(api.RecordState(&newState))
 	_, err = client.Token(ctx)
 	if err != nil {
@@ -122,14 +122,14 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 		return nil, err
 	}
 
-	//clear out eventual consistency helpers
+	// clear out eventual consistency helpers
 	client.VaultClient = client.VaultClient.WithRequestCallbacks().WithResponseCallbacks()
 
 	ln, err := net.Listen("tcp", "127.0.0.1:8200")
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
 	}
-	srv := proxy.New(logger, client)
+	srv := proxy.New(logger, client, config.CacheConfigFromEnv())
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

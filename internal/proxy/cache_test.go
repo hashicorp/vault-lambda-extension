@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/consts"
 	"github.com/stretchr/testify/assert"
@@ -204,27 +204,48 @@ func Test_makeRequestHash(t *testing.T) {
 }
 
 func TestNewCache(t *testing.T) {
-	cache := NewCache(10 * time.Second)
+	cache := NewCache(config.CacheConfig{
+		TTL: 10 * time.Second,
+	})
 	require.NotNilf(t, cache, `NewCache(%s) returns nil`, "10*time.Second")
+
+	cacheEnabled := NewCache(config.CacheConfig{
+		TTL:            10 * time.Second,
+		DefaultEnabled: true,
+	})
+	require.NotNil(t, cacheEnabled)
 }
 
 func TestSetupCache(t *testing.T) {
 	t.Run("Valid vault cache TTL shall set up and return cache successfully", func(t *testing.T) {
-		ttlArray := []string{"15m", "2s", "1h3m", "0h2m3s", "1h2m3s", "15s"}
+		ttlArray := []time.Duration{5 * time.Minute, 1 * time.Second}
 		for _, ttl := range ttlArray {
-			os.Setenv(vaultCacheTTL, ttl)
-			cache := setupCache()
+			cache := setupCache(config.CacheConfig{TTL: ttl})
 			require.NotNilf(t, cache, `setupCache() returns nil with env variable: %s`, ttl)
+			assert.Equal(t, ttl, cache.timeout)
+			assert.False(t, cache.enabled)
 		}
 	})
 
 	t.Run("Invalid vault cache TTL shall fail to set up and return cache", func(t *testing.T) {
-		ttlArray := []string{"15sm", "2st", "1h3m5t", "-0h2m3s", "15", "-15s"}
+		ttlArray := []time.Duration{-2 * time.Minute, 0}
 		for _, ttl := range ttlArray {
-			os.Setenv(vaultCacheTTL, ttl)
-			cache := setupCache()
-			require.Nilf(t, cache, `setupCache() does not return nil with env variable: %s`, ttl)
+			cache := setupCache(config.CacheConfig{TTL: ttl})
+			require.Nil(t, cache, `setupCache() does not return nil with ttl: %s`, ttl)
 		}
+	})
+
+	t.Run("Valid vault default cache enabled shall set up and return cache successfully", func(t *testing.T) {
+		cache := setupCache(config.CacheConfig{TTL: 5 * time.Minute, DefaultEnabled: true})
+		require.NotNil(t, cache)
+		assert.True(t, cache.enabled)
+		assert.Equal(t, 5*time.Minute, cache.timeout)
+	})
+
+	t.Run("False vault default cache enabled shall result in cache.enabled=false", func(t *testing.T) {
+		cache := setupCache(config.CacheConfig{TTL: 5 * time.Minute, DefaultEnabled: false})
+		require.NotNil(t, cache)
+		assert.False(t, cache.enabled)
 	})
 }
 
@@ -235,7 +256,7 @@ func TestGetAfterSet(t *testing.T) {
 			Body:       []byte(fmt.Sprint(rand.Intn(100))),
 			StatusCode: http.StatusOK,
 		}
-		cache := NewCache(10 * time.Second)
+		cache := NewCache(config.CacheConfig{TTL: 10 * time.Second})
 		cacheKey := CacheKey{
 			Token: "blue",
 			Request: &http.Request{
@@ -264,7 +285,7 @@ func TestGetAfterSet(t *testing.T) {
 			Body:       []byte(fmt.Sprint(rand.Intn(100))),
 			StatusCode: http.StatusOK,
 		}
-		cache := NewCache(1 * time.Second)
+		cache := NewCache(config.CacheConfig{TTL: 1 * time.Second})
 		cacheKey := CacheKey{
 			Token: "blue",
 			Request: &http.Request{
@@ -290,7 +311,7 @@ func TestGetAfterSet(t *testing.T) {
 	})
 
 	t.Run("deleted item not returned", func(t *testing.T) {
-		cache := NewCache(1 * time.Hour)
+		cache := NewCache(config.CacheConfig{TTL: 1 * time.Hour})
 		cacheData := &CacheData{
 			Header:     nil,
 			Body:       []byte(fmt.Sprint(rand.Intn(100))),
@@ -312,7 +333,6 @@ func TestGetAfterSet(t *testing.T) {
 }
 
 func TestShallFetchCache(t *testing.T) {
-	cache := NewCache(10 * time.Second)
 	tests := map[string]struct {
 		cache        *Cache
 		cacheControl string
@@ -320,7 +340,7 @@ func TestShallFetchCache(t *testing.T) {
 		expected     bool
 	}{
 		"Shall fetch from cache when cache-control header is 'cache'": {
-			cache:        cache,
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: headerOptionCacheable,
 			method:       http.MethodGet,
 			expected:     true,
@@ -332,26 +352,50 @@ func TestShallFetchCache(t *testing.T) {
 			expected:     false,
 		},
 		"Shall not fetch from cache when cache-control header is incorrect": {
-			cache:        cache,
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: "crash,cache.,cache=1,cache=true",
 			method:       http.MethodGet,
 			expected:     false,
 		},
 		"Shall not fetch from cache when cache-control is 'recache'": {
-			cache:        cache,
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: headerOptionRecache,
 			method:       http.MethodGet,
 			expected:     false,
 		},
 		"Shall not fetch from cache when http method is not GET": {
-			cache:        cache,
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: headerOptionCacheable,
 			method:       http.MethodPost,
 			expected:     false,
 		},
-		"Shall not refresh cache when cache-control header is empty": {
-			cache:        cache,
+		"Shall not fetch from cache when cache-control header is empty": {
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: "",
+			method:       http.MethodGet,
+			expected:     false,
+		},
+		"No cache when cache-control header is nocache": {
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
+			cacheControl: headerOptionNocache,
+			method:       http.MethodGet,
+			expected:     false,
+		},
+		"Shall fetch from cache when default enabled": {
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second, DefaultEnabled: true}),
+			cacheControl: "",
+			method:       http.MethodGet,
+			expected:     true,
+		},
+		"Shall not fetch from cache when default enabled and 'nocache' set": {
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second, DefaultEnabled: true}),
+			cacheControl: headerOptionNocache,
+			method:       http.MethodGet,
+			expected:     false,
+		},
+		"Shall not fetch from cache when default enabled and 'recache' set": {
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second, DefaultEnabled: true}),
+			cacheControl: headerOptionRecache,
 			method:       http.MethodGet,
 			expected:     false,
 		},
@@ -367,24 +411,23 @@ func TestShallFetchCache(t *testing.T) {
 }
 
 func TestShallRefreshCache(t *testing.T) {
-	cache := NewCache(10 * time.Second)
 	tests := map[string]struct {
 		cache        *Cache
 		cacheControl string
 		expected     bool
 	}{
 		"Shall refresh cache when cache-control header is 'cache'": {
-			cache:        cache,
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: headerOptionCacheable,
 			expected:     true,
 		},
 		"Shall refresh cache when cache-control header is 'recache'": {
-			cache:        cache,
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: headerOptionRecache,
 			expected:     true,
 		},
 		"Shall refresh cache when cache-control header is 'cache,recache'": {
-			cache:        cache,
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: strings.Join([]string{headerOptionCacheable, headerOptionRecache}, ","),
 			expected:     true,
 		},
@@ -394,14 +437,34 @@ func TestShallRefreshCache(t *testing.T) {
 			expected:     false,
 		},
 		"Shall not refresh cache when cache-control header is incorrect": {
-			cache:        cache,
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: "nope",
 			expected:     false,
 		},
 		"Shall not refresh cache when cache-control header is empty": {
-			cache:        cache,
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
 			cacheControl: "",
 			expected:     false,
+		},
+		"No cache when cache-control header is nocache": {
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second}),
+			cacheControl: headerOptionNocache,
+			expected:     false,
+		},
+		"Shall refresh cache when default enabled": {
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second, DefaultEnabled: true}),
+			cacheControl: "",
+			expected:     true,
+		},
+		"Shall not refresh cache when default enabled and 'nocache' set": {
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second, DefaultEnabled: true}),
+			cacheControl: headerOptionNocache,
+			expected:     false,
+		},
+		"Shall refresh cache when default enabled and 'recache' set": {
+			cache:        NewCache(config.CacheConfig{TTL: 10 * time.Second, DefaultEnabled: true}),
+			cacheControl: headerOptionRecache,
+			expected:     true,
 		},
 	}
 	for name, tc := range tests {

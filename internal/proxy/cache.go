@@ -9,10 +9,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/cryptoutil"
 	"github.com/hashicorp/vault/sdk/helper/strutil"
@@ -20,19 +20,21 @@ import (
 )
 
 const (
-	vaultCacheTTL = "VAULT_DEFAULT_CACHE_TTL"
-
 	// Return a cached response if it exists, otherwise fall back to Vault and
 	// cache the response
 	headerOptionCacheable = "cache"
 
 	// Send the request to Vault and cache the response
 	headerOptionRecache = "recache"
+
+	// Ignore the cache and send the request to Vault, do not cache the response
+	headerOptionNocache = "nocache"
 )
 
 type Cache struct {
 	data    *gocache.Cache
 	timeout time.Duration
+	enabled bool
 }
 
 type CacheKey struct {
@@ -50,12 +52,14 @@ type CacheData struct {
 type CacheOptions struct {
 	cacheable bool
 	recache   bool
+	nocache   bool
 }
 
-func NewCache(timeout time.Duration) *Cache {
+func NewCache(cc config.CacheConfig) *Cache {
 	return &Cache{
-		data:    gocache.New(timeout, timeout),
-		timeout: timeout,
+		data:    gocache.New(cc.TTL, cc.TTL),
+		timeout: cc.TTL,
+		enabled: cc.DefaultEnabled,
 	}
 }
 
@@ -136,23 +140,22 @@ func (c *Cache) Remove(keyStr string) {
 	c.data.Delete(keyStr)
 }
 
-func setupCache() *Cache {
-	cacheTTLEnv := os.Getenv(vaultCacheTTL)
-	if cacheTTLEnv != "" {
-		cacheTTL, err := time.ParseDuration(cacheTTLEnv)
-		if err == nil && cacheTTL > 0 {
-			return NewCache(cacheTTL)
-		}
+func setupCache(cacheConfig config.CacheConfig) *Cache {
+	if cacheConfig.TTL <= 0 {
+		return nil
 	}
-	return nil
+	return NewCache(cacheConfig)
 }
 
 func parseCacheOptions(cacheControlHeader string) *CacheOptions {
 	values := strings.Split(cacheControlHeader, ",")
-	return &CacheOptions{
+	options := &CacheOptions{
 		cacheable: strutil.StrListContains(values, headerOptionCacheable),
 		recache:   strutil.StrListContains(values, headerOptionRecache),
+		nocache:   strutil.StrListContains(values, headerOptionNocache),
 	}
+
+	return options
 }
 
 func shallFetchCache(r *http.Request, cache *Cache) bool {
@@ -160,7 +163,7 @@ func shallFetchCache(r *http.Request, cache *Cache) bool {
 		return false
 	}
 	options := parseCacheOptions(r.Header.Get(VaultCacheControlHeaderName))
-	cacheable := options.cacheable && !options.recache
+	cacheable := (cache.enabled || options.cacheable) && !options.recache && !options.nocache
 	return r.Method == http.MethodGet && cacheable
 }
 
@@ -169,7 +172,7 @@ func shallRefreshCache(r *http.Request, cache *Cache) bool {
 		return false
 	}
 	options := parseCacheOptions(r.Header.Get(VaultCacheControlHeaderName))
-	cacheable := options.cacheable || options.recache
+	cacheable := (cache.enabled || options.cacheable || options.recache) && !options.nocache
 	return r.Method == http.MethodGet && cacheable
 }
 

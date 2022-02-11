@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/sdk/helper/consts"
 )
@@ -20,8 +21,8 @@ const (
 )
 
 // New returns an unstarted HTTP server with health and proxy handlers.
-func New(logger *log.Logger, client *vault.Client) *http.Server {
-	cache := setupCache()
+func New(logger *log.Logger, client *vault.Client, cacheConfig config.CacheConfig) *http.Server {
+	cache := setupCache(cacheConfig)
 	mux := http.ServeMux{}
 	mux.HandleFunc("/", proxyHandler(logger, client, cache))
 	srv := http.Server{
