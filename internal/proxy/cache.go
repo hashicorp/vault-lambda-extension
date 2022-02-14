@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -182,18 +181,10 @@ func fetchFromCache(w http.ResponseWriter, data *CacheData) {
 	w.Write(data.Body)
 }
 
-func retrieveData(resp *http.Response) *CacheData {
-	data := &CacheData{}
-	data.StatusCode = resp.StatusCode
-	data.Header = resp.Header
-
-	var buf bytes.Buffer
-	_, err := io.Copy(&buf, resp.Body)
-	if err != nil {
-		data.StatusCode = http.StatusInternalServerError // also cache errors
-		data.Body = []byte(fmt.Sprintf("failed to write response back to requester: %s", err))
-	} else {
-		data.Body = buf.Bytes()
+func retrieveData(resp *http.Response, body []byte) *CacheData {
+	return &CacheData{
+		StatusCode: resp.StatusCode,
+		Header:     resp.Header,
+		Body:       body,
 	}
-	return data
 }

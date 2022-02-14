@@ -493,6 +493,6 @@ func TestRetrieveData(t *testing.T) {
 		Request:       r,
 		Header:        make(http.Header),
 	}
-	cacheData := retrieveData(resp)
+	cacheData := retrieveData(resp, []byte(body))
 	require.Truef(t, cacheData.StatusCode == statusCode && string(cacheData.Body) == body, `retrieveData() shall return the same body: %s`, body)
 }

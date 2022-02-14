@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -15,7 +16,7 @@ import (
 const (
 	VaultCacheControlHeaderName = "X-Vault-Cache-Control"
 
-	// TODO: remove these definitions once they're available in Vault's api package
+	// Note: remove these definitions once they're available in Vault's api package
 	VaultInconsistentHeaderName = "X-Vault-Inconsistent"
 	VaultForwardHeaderName      = "X-Vault-Forward"
 )
@@ -78,7 +79,16 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 
 		defer resp.Body.Close()
 
-		if shallRefreshCache(r, cache) {
+		// Save the response body
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, resp.Body)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to read response body: %s", err), http.StatusInternalServerError)
+			return
+		}
+		respBody := buf.Bytes()
+
+		if shallRefreshCache(r, cache) && resp.StatusCode < 300 {
 			if cacheKeyHash == "" {
 				// Construct the hash for this request to use as the cache key
 				cacheKeyHash, err = makeRequestHash(logger, r, token)
@@ -89,23 +99,18 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 				}
 			}
 
-			data := retrieveData(resp)
-
-			cache.Set(cacheKeyHash, data)
+			cache.Set(cacheKeyHash, retrieveData(resp, respBody))
 
 			logger.Printf("Refreshed cache for: %s %s", r.Method, r.URL.Path)
+		}
 
-			fetchFromCache(w, data)
+		copyHeaders(w.Header(), resp.Header)
+		w.WriteHeader(resp.StatusCode)
 
-		} else {
-			copyHeaders(w.Header(), resp.Header)
-			w.WriteHeader(resp.StatusCode)
-
-			_, err = io.Copy(w, resp.Body)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to write response back to requester: %s", err), http.StatusInternalServerError)
-				return
-			}
+		_, err = w.Write(respBody)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to write response back to requester: %s", err), http.StatusInternalServerError)
+			return
 		}
 
 		logger.Printf("Successfully proxied %s %s\n", r.Method, r.URL.Path)
