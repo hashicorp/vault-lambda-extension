@@ -51,8 +51,13 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 			return
 		}
 
+		// If this request could result in cache.Get() or cache.Set(), acquire a
+		// lock for this request's cache key to prevent parallel identical
+		// requests from hitting Vault before one response is cached.
+		doCacheGet := shallFetchCache(fwReq, cache)
+		doCacheSet := shallRefreshCache(fwReq, cache)
 		cacheKeyHash := ""
-		if shallFetchCache(fwReq, cache) {
+		if doCacheGet || doCacheSet {
 			// Construct the hash for this request to use as the cache key
 			cacheKeyHash, err = makeRequestHash(logger, r, token)
 			if err != nil {
@@ -64,7 +69,9 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 			requestLock := locksutil.LockForKey(cache.requestLocks, cacheKeyHash)
 			requestLock.Lock()
 			defer requestLock.Unlock()
+		}
 
+		if doCacheGet {
 			// Check the cache for this request
 			data, err := cache.Get(cacheKeyHash)
 			if err != nil {
@@ -94,19 +101,8 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 		}
 		respBody := buf.Bytes()
 
-		if shallRefreshCache(r, cache) && resp.StatusCode < 300 {
-			if cacheKeyHash == "" {
-				// Construct the hash for this request to use as the cache key
-				cacheKeyHash, err = makeRequestHash(logger, r, token)
-				if err != nil {
-					logger.Printf("failed to compute request hash: %s", err)
-					http.Error(w, "failed to read request", http.StatusInternalServerError)
-					return
-				}
-			}
-
+		if doCacheSet && resp.StatusCode < 300 {
 			cache.Set(cacheKeyHash, retrieveData(resp, respBody))
-
 			logger.Printf("Refreshed cache for: %s %s", r.Method, r.URL.Path)
 		}
 
