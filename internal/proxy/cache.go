@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/cryptoutil"
+	"github.com/hashicorp/vault/sdk/helper/locksutil"
 	"github.com/hashicorp/vault/sdk/helper/strutil"
 	gocache "github.com/patrickmn/go-cache"
 )
@@ -34,6 +35,10 @@ type Cache struct {
 	data    *gocache.Cache
 	timeout time.Duration
 	enabled bool
+
+	// requestLocks is used during cache lookup to ensure that identical
+	// requests made in parallel do not all hit vault
+	requestLocks []*locksutil.LockEntry
 }
 
 type CacheKey struct {
@@ -56,9 +61,10 @@ type CacheOptions struct {
 
 func NewCache(cc config.CacheConfig) *Cache {
 	return &Cache{
-		data:    gocache.New(cc.TTL, cc.TTL),
-		timeout: cc.TTL,
-		enabled: cc.DefaultEnabled,
+		data:         gocache.New(cc.TTL, cc.TTL),
+		timeout:      cc.TTL,
+		enabled:      cc.DefaultEnabled,
+		requestLocks: locksutil.CreateLocks(),
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/sdk/helper/consts"
+	"github.com/hashicorp/vault/sdk/helper/locksutil"
 )
 
 const (
@@ -59,6 +60,11 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 				http.Error(w, "failed to read request", http.StatusInternalServerError)
 				return
 			}
+
+			requestLock := locksutil.LockForKey(cache.requestLocks, cacheKeyHash)
+			requestLock.Lock()
+			defer requestLock.Unlock()
+
 			// Check the cache for this request
 			data, err := cache.Get(cacheKeyHash)
 			if err != nil {
