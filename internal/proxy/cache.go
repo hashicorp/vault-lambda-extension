@@ -67,10 +67,17 @@ func NewCache(cc config.CacheConfig) *Cache {
 func makeRequestHash(logger *log.Logger, r *http.Request, token string) (string, error) {
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		if r.Body != nil {
+			if err := r.Body.Close(); err != nil {
+				logger.Printf("error closing request body: %s", err)
+			}
+		}
 		return "", fmt.Errorf("failed to read request body: %w", err)
 	}
 	if r.Body != nil {
-		r.Body.Close()
+		if err := r.Body.Close(); err != nil {
+			logger.Printf("error closing request body: %s", err)
+		}
 	}
 	r.Body = ioutil.NopCloser(bytes.NewReader(reqBody))
 	cacheKey := &CacheKey{
