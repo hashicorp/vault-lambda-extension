@@ -194,7 +194,7 @@ See documentation on [`sts_regional_endpoints`][lambda-sts-regional-endpoints] f
 
 Caching can be configured for the extension's local proxy server so that it does
 not forward every HTTP request to Vault. To turn on caching, set the environment
-variable `VAULT_DEFAULT_CACHE_TTL` to a valid value that is parsable by
+variable `VAULT_DEFAULT_CACHE_TTL` to a valid value that is parsable as a
 time.Duration in Go, for example, "15m", "1h", "2m3s" or "1h2m3s", depending on
 application needs. An invalid or negative value will be treated the same as a
 missing value, in which case, caching will not be set up and enabled.
@@ -211,8 +211,7 @@ where caching makes sense without negative impact over others.
 
 You can always override caching and forward a request to Vault, for example in
 the case of expired secrets, set "X-Vault-Cache-Control: recache". The proxy
-server will forward the request to Vault and refresh its cache with the response
-so that a later cache hit can retrieve the newer secrets.
+server will forward the request to Vault and refresh its cache with the response.
 
 Caching may also be enabled by default by setting the environment variable
 `VAULT_DEFAULT_CACHE_ENABLE` to `true`. Then all requests will be cached/fetched
