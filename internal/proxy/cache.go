@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault/api"
@@ -32,9 +31,11 @@ const (
 )
 
 type Cache struct {
-	data    *gocache.Cache
-	timeout time.Duration
-	enabled bool
+	data *gocache.Cache
+
+	// defaultOn means caching is enabled for all requests without the need for
+	// explicitly setting a caching header
+	defaultOn bool
 
 	// requestLocks is used during cache lookup to ensure that identical
 	// requests made in parallel do not all hit vault
@@ -62,8 +63,7 @@ type CacheOptions struct {
 func NewCache(cc config.CacheConfig) *Cache {
 	return &Cache{
 		data:         gocache.New(cc.TTL, cc.TTL),
-		timeout:      cc.TTL,
-		enabled:      cc.DefaultEnabled,
+		defaultOn:    cc.DefaultEnabled,
 		requestLocks: locksutil.CreateLocks(),
 	}
 }
@@ -175,7 +175,7 @@ func shallFetchCache(r *http.Request, cache *Cache) bool {
 		return false
 	}
 	options := parseCacheOptions(r.Header.Get(VaultCacheControlHeaderName))
-	cacheable := (cache.enabled || options.cacheable) && !options.recache && !options.nocache
+	cacheable := (cache.defaultOn || options.cacheable) && !options.recache && !options.nocache
 	return r.Method == http.MethodGet && cacheable
 }
 
@@ -184,7 +184,7 @@ func shallRefreshCache(r *http.Request, cache *Cache) bool {
 		return false
 	}
 	options := parseCacheOptions(r.Header.Get(VaultCacheControlHeaderName))
-	cacheable := (cache.enabled || options.cacheable || options.recache) && !options.nocache
+	cacheable := (cache.defaultOn || options.cacheable || options.recache) && !options.nocache
 	return r.Method == http.MethodGet && cacheable
 }
 

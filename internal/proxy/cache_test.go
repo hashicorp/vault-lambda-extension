@@ -222,8 +222,7 @@ func TestSetupCache(t *testing.T) {
 		for _, ttl := range ttlArray {
 			cache := setupCache(config.CacheConfig{TTL: ttl})
 			require.NotNilf(t, cache, `setupCache() returns nil with env variable: %s`, ttl)
-			assert.Equal(t, ttl, cache.timeout)
-			assert.False(t, cache.enabled)
+			assert.False(t, cache.defaultOn)
 		}
 	})
 
@@ -238,14 +237,13 @@ func TestSetupCache(t *testing.T) {
 	t.Run("Valid vault default cache enabled shall set up and return cache successfully", func(t *testing.T) {
 		cache := setupCache(config.CacheConfig{TTL: 5 * time.Minute, DefaultEnabled: true})
 		require.NotNil(t, cache)
-		assert.True(t, cache.enabled)
-		assert.Equal(t, 5*time.Minute, cache.timeout)
+		assert.True(t, cache.defaultOn)
 	})
 
 	t.Run("False vault default cache enabled shall result in cache.enabled=false", func(t *testing.T) {
 		cache := setupCache(config.CacheConfig{TTL: 5 * time.Minute, DefaultEnabled: false})
 		require.NotNil(t, cache)
-		assert.False(t, cache.enabled)
+		assert.False(t, cache.defaultOn)
 	})
 }
 
@@ -285,7 +283,7 @@ func TestGetAfterSet(t *testing.T) {
 			Body:       []byte(fmt.Sprint(rand.Intn(100))),
 			StatusCode: http.StatusOK,
 		}
-		cache := NewCache(config.CacheConfig{TTL: 1 * time.Second})
+		cache := NewCache(config.CacheConfig{TTL: 10 * time.Millisecond})
 		cacheKey := CacheKey{
 			Token: "blue",
 			Request: &http.Request{
@@ -303,7 +301,7 @@ func TestGetAfterSet(t *testing.T) {
 		require.NotEmpty(t, cacheKeyHash)
 		cache.Set(cacheKeyHash, cacheData)
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(20 * time.Millisecond)
 		cacheDataOut, err := cache.Get(cacheKeyHash)
 
 		require.NoError(t, err)
@@ -488,7 +486,7 @@ func TestRetrieveData(t *testing.T) {
 		Proto:         "HTTP/1.1",
 		ProtoMajor:    1,
 		ProtoMinor:    1,
-		Body:          ioutil.NopCloser(bytes.NewBufferString(body)),
+		Body:          ioutil.NopCloser(bytes.NewBufferString("Not Hello World")),
 		ContentLength: int64(len(body)),
 		Request:       r,
 		Header:        make(http.Header),
