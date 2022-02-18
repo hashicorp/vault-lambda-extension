@@ -84,6 +84,7 @@ func TestProxy(t *testing.T) {
 		proxyVaultClient, err := api.NewClient(&api.Config{
 			Address: "http://" + proxyAddr,
 		})
+		require.NoError(t, err)
 		resp, err := proxyVaultClient.Logical().Read("secret/data/foo")
 		require.NoError(t, err)
 		require.Equal(t, "bar", resp.Data["foo"])
