@@ -408,6 +408,41 @@ func TestShallFetchCache(t *testing.T) {
 	}
 }
 
+func TestShallFetchCache_multiple_headers(t *testing.T) {
+	tests := map[string]struct {
+		cacheControl []string
+		expected     bool
+	}{
+		"No cache when 'nocache' set as second header": {
+			cacheControl: []string{headerOptionCacheable, headerOptionNocache},
+			expected:     false,
+		},
+		"No cache when 'nocache' set as first header": {
+			cacheControl: []string{headerOptionNocache, headerOptionCacheable},
+			expected:     false,
+		},
+		"Cache when repeated": {
+			cacheControl: []string{headerOptionCacheable, headerOptionCacheable},
+			expected:     true,
+		},
+		"Cache when good and bad headers": {
+			cacheControl: []string{"nope", headerOptionCacheable},
+			expected:     true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := NewCache(config.CacheConfig{TTL: 10 * time.Second})
+			r := httptest.NewRequest(http.MethodGet, "/v1/uuid/s1", nil)
+			for _, h := range tc.cacheControl {
+				r.Header.Add(VaultCacheControlHeaderName, h)
+			}
+			shallFetch := shallFetchCache(r, cache)
+			assert.Equal(t, tc.expected, shallFetch)
+		})
+	}
+}
+
 func TestShallRefreshCache(t *testing.T) {
 	tests := map[string]struct {
 		cache        *Cache
@@ -470,6 +505,41 @@ func TestShallRefreshCache(t *testing.T) {
 			r := httptest.NewRequest("GET", "/v1/uuid/s1", nil)
 			r.Header.Set(VaultCacheControlHeaderName, tc.cacheControl)
 			shallFetch := shallRefreshCache(r, tc.cache)
+			assert.Equal(t, tc.expected, shallFetch)
+		})
+	}
+}
+
+func TestShallRefreshCache_multiple_headers(t *testing.T) {
+	tests := map[string]struct {
+		cacheControl []string
+		expected     bool
+	}{
+		"Shall refresh cache when cache-control headers are 'cache' and 'recache'": {
+			cacheControl: []string{headerOptionCacheable, headerOptionRecache},
+			expected:     true,
+		},
+		"Shall not refresh cache when cache-control headers are 'nocache' and 'recache'": {
+			cacheControl: []string{headerOptionNocache, headerOptionRecache},
+			expected:     false,
+		},
+		"Shall not refresh cache when cache-control headers are 'recache' and 'nocache'": {
+			cacheControl: []string{headerOptionRecache, headerOptionNocache},
+			expected:     false,
+		},
+		"Shall refresh cache with good and bad headers": {
+			cacheControl: []string{headerOptionRecache, "nope", headerOptionCacheable},
+			expected:     true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := NewCache(config.CacheConfig{TTL: 10 * time.Second})
+			r := httptest.NewRequest("GET", "/v1/uuid/s1", nil)
+			for _, h := range tc.cacheControl {
+				r.Header.Add(VaultCacheControlHeaderName, h)
+			}
+			shallFetch := shallRefreshCache(r, cache)
 			assert.Equal(t, tc.expected, shallFetch)
 		})
 	}
