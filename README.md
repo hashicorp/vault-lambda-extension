@@ -170,6 +170,8 @@ Environment variable    | Description | Required | Example value
 `VAULT_TLS_SERVER_NAME` | Name to use as the SNI host when connecting via TLS | No | `vault.example.com`
 `VAULT_RATE_LIMIT`      | Only applies to a single invocation of the extension. See [Vault Commands (CLI)][vault-env-vars] documentation for details. Ignored by proxy server | No | `10`
 `VAULT_NAMESPACE`       | The namespace to use for pre-configured secrets. Ignored by proxy server | No | `education`
+`VAULT_DEFAULT_CACHE_TTL` | The time to live configuration (aka, TTL) of the cache used by proxy server. Must have a unit and be parsable as a time.Duration. Required for caching to be enabled. | No | `15m`
+`VAULT_DEFAULT_CACHE_ENABLED` | Enable caching for all requests, without needing to set the X-Vault-Cache-Control header for each request. Must be set to a boolean value. | No | `true`
 
 ### AWS STS client configuration
 
@@ -187,6 +189,34 @@ Then you may need to configure the extension's STS client to also use the region
 STS endpoint by setting `AWS_STS_REGIONAL_ENDPOINTS=regional`, because both the AWS Golang
 SDK and Vault IAM auth method default to using the global endpoint in many regions.
 See documentation on [`sts_regional_endpoints`][lambda-sts-regional-endpoints] for more information.
+
+### Caching
+
+Caching can be configured for the extension's local proxy server so that it does
+not forward every HTTP request to Vault. The main consideration behind caching
+design is to make caching an explicit opt-in at the request level, so that it is
+only enabled for scenarios where caching makes sense without negative impact in
+others. To turn on caching, set the environment variable
+`VAULT_DEFAULT_CACHE_TTL` to a valid value that is parsable as a time.Duration
+in Go, for example, "15m", "1h", "2m3s" or "1h2m3s", depending on application
+needs. An invalid or negative value will be treated the same as a missing value,
+in which case, caching will not be set up and enabled.
+
+Then requests with HTTP method of "GET", and the HTTP header
+`X-Vault-Cache-Control: cache` will be returned directly from the cache if
+there's a cache hit. On a cache miss the request will be forwarded to Vault and
+the response returned and cached. If the header is set to
+`X-Vault-Cache-Control: recache`, the cache lookup will be skipped, and the
+request will be forwarded to Vault and the response returned and cached.
+Currently, the cache key is a hash of the request URL path, headers, body, and
+token.
+
+Caching may also be enabled for all requests by setting the environment variable
+`VAULT_DEFAULT_CACHE_ENABLE` to `true`. Then all requests will be fetched and/or
+cached as though the header `X-Vault-Cache-Control: cache` was present. Setting
+the header to `nocache` on a request will opt-out of caching entirely in this
+configuration. Setting the header to `recache` will skip the cache lookup and
+return and cache the response from Vault as described previously.
 
 ## Limitations
 
