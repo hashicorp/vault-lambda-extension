@@ -33,10 +33,6 @@ func main() {
 	logger := log.New(os.Stderr, fmt.Sprintf("[%s] ", extensionName), log.Ldate|log.Ltime|log.LUTC)
 	ctx, cancel := context.WithCancel(context.Background())
 	extensionClient := extension.NewClient(os.Getenv("AWS_LAMBDA_RUNTIME_API"))
-	_, err := extensionClient.Register(ctx, extensionName)
-	if err != nil {
-		logger.Fatal(err)
-	}
 
 	var wg sync.WaitGroup
 	srv, err := runExtension(ctx, logger, &wg)
@@ -63,6 +59,11 @@ func main() {
 			logger.Printf("HTTP server shutdown error: %s\n", err)
 		}
 	}()
+
+	_, err = extensionClient.Register(ctx, extensionName)
+	if err != nil {
+		logger.Fatal(err)
+	}
 
 	processEvents(ctx, logger, extensionClient)
 
