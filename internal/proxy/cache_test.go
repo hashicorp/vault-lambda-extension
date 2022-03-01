@@ -48,9 +48,9 @@ func TestCache_computeRequestID(t *testing.T) {
 						Path: "test",
 					},
 					Header: http.Header{
-						api.HeaderIndex:             []string{"foo"},
-						VaultInconsistentHeaderName: []string{"foo"},
-						VaultForwardHeaderName:      []string{"foo"},
+						api.HeaderIndex:        []string{"foo"},
+						api.HeaderInconsistent: []string{"foo"},
+						api.HeaderForward:      []string{"foo"},
 					},
 				},
 			},
@@ -92,9 +92,9 @@ func TestCache_computeRequestID_moreTests(t *testing.T) {
 					Path: "test",
 				},
 				Header: http.Header{
-					api.HeaderIndex:             []string{"foo"},
-					VaultInconsistentHeaderName: []string{"foo"},
-					VaultForwardHeaderName:      []string{"foo"},
+					api.HeaderIndex:        []string{"foo"},
+					api.HeaderInconsistent: []string{"foo"},
+					api.HeaderForward:      []string{"foo"},
 				},
 			},
 		}
