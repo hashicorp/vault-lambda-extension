@@ -111,8 +111,8 @@ func computeRequestID(key *CacheKey) (string, error) {
 
 	cloned := key.Request.Clone(context.Background())
 	cloned.Header.Del(api.HeaderIndex)
-	cloned.Header.Del(VaultForwardHeaderName)
-	cloned.Header.Del(VaultInconsistentHeaderName)
+	cloned.Header.Del(api.HeaderForward)
+	cloned.Header.Del(api.HeaderInconsistent)
 	cloned.Header.Del(VaultCacheControlHeaderName)
 	// Serialize the request
 	if err := cloned.Write(&b); err != nil {
