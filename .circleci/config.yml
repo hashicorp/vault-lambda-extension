@@ -3,11 +3,10 @@ version: 2.1
 
 references:
   images:
-    go: &GOLANG_IMAGE docker.mirror.hashicorp.services/circleci/golang:1.17.2
+    go: &GOLANG_IMAGE docker.mirror.hashicorp.services/cimg/go:1.17.7
 
   paths:
     test-results: &TEST_RESULTS_DIR /tmp/test-results
-    working-directory: &WORKING_DIRECTORY /go/src/github.com/hashicorp/vault-lambda-extension
 
   environment: &ENVIRONMENT
     TEST_RESULTS_DIR: *TEST_RESULTS_DIR
@@ -18,7 +17,6 @@ jobs:
   lint:
     docker:
       - image: *GOLANG_IMAGE
-    working_directory: *WORKING_DIRECTORY
     environment:
       <<: *ENVIRONMENT
     steps:
@@ -30,7 +28,6 @@ jobs:
   gomod:
     docker:
       - image: *GOLANG_IMAGE
-    working_directory: *WORKING_DIRECTORY
     steps:
       - checkout
       - run:
@@ -44,7 +41,6 @@ jobs:
   build:
     docker:
       - image: *GOLANG_IMAGE
-    working_directory: *WORKING_DIRECTORY
     steps:
       - checkout
       - run: make build
@@ -54,7 +50,6 @@ jobs:
       - image: *GOLANG_IMAGE
     environment:
       <<: *ENVIRONMENT
-    working_directory: *WORKING_DIRECTORY
     steps:
       - checkout
       - run: mkdir -p $TEST_RESULTS_DIR/go-test && make test
