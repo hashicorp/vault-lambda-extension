@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
@@ -111,12 +111,12 @@ func startProxy(t *testing.T, vaultAddress string, ses *session.Session) (string
 	vaultConfig := api.DefaultConfig()
 	require.NoError(t, vaultConfig.Error)
 	vaultConfig.Address = vaultAddress
-	client, err := vault.NewClient(log.New(ioutil.Discard, "", 0), vaultConfig, config.AuthConfig{}, ses)
+	client, err := vault.NewClient(hclog.NewNullLogger(), vaultConfig, config.AuthConfig{}, ses)
 	require.NoError(t, err)
 	client.VaultConfig.Address = vaultAddress
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	proxy := New(log.New(ioutil.Discard, "", 0), client, config.CacheConfig{})
+	proxy := New(hclog.NewNullLogger(), client, config.CacheConfig{})
 	go func() {
 		_ = proxy.Serve(ln)
 	}()

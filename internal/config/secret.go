@@ -68,7 +68,7 @@ func ParseConfiguredSecrets() ([]ConfiguredSecret, error) {
 			return nil, fmt.Errorf("os.Environ should return key=value pairs, but got %s", kv)
 		}
 		key := parts[0]
-		value := parts[1]
+		value := strings.TrimSpace(parts[1])
 
 		switch {
 		case strings.HasPrefix(key, vaultSecretPathPrefix):
@@ -105,12 +105,12 @@ func ParseConfiguredSecrets() ([]ConfiguredSecret, error) {
 	}
 
 	// Special case for anonymous-name secret
-	anonymousSecretVaultPath := getenv(vaultSecretPathKey)
+	anonymousSecretVaultPath := strings.TrimSpace(getenv(vaultSecretPathKey))
 	if anonymousSecretVaultPath != "" {
 		s := &ConfiguredSecret{
 			name:      "",
 			VaultPath: anonymousSecretVaultPath,
-			FilePath:  filePathFromEnv(getenv(vaultSecretFileKey)),
+			FilePath:  filePathFromEnv(strings.TrimSpace(getenv(vaultSecretFileKey))),
 		}
 		if s.FilePath == "" {
 			s.FilePath = path.Join(DefaultSecretDirectory, DefaultSecretFile)

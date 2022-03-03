@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault/api"
 )
@@ -29,7 +30,7 @@ type Client struct {
 	VaultClient *api.Client
 	VaultConfig *api.Config
 
-	logger     *log.Logger
+	logger     hclog.Logger
 	stsSvc     *sts.STS
 	authConfig config.AuthConfig
 
@@ -42,7 +43,7 @@ type Client struct {
 
 // NewClient uses the AWS IAM auth method configured in a Vault cluster to
 // authenticate the execution role and create a Vault API client.
-func NewClient(logger *log.Logger, vaultConfig *api.Config, authConfig config.AuthConfig, awsSes *session.Session) (*Client, error) {
+func NewClient(logger hclog.Logger, vaultConfig *api.Config, authConfig config.AuthConfig, awsSes *session.Session) (*Client, error) {
 	vaultClient, err := api.NewClient(vaultConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error making extension: %w", err)
@@ -73,17 +74,17 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 	defer c.mtx.Unlock()
 
 	if c.expired() {
-		c.logger.Println("authenticating to Vault")
+		c.logger.Debug("authenticating to Vault")
 		err := c.login(ctx)
 		if err != nil {
 			return "", err
 		}
 	} else if c.shouldRenew() {
 		// Renew but don't retry or bail on errors, just best effort.
-		c.logger.Println("renewing Vault token")
+		c.logger.Debug("renewing Vault token")
 		err := c.renew()
 		if err != nil {
-			c.logger.Printf("failed to renew token but attempting to continue: %s\n", err)
+			c.logger.Error("failed to renew token but attempting to continue", "error", err)
 		}
 	}
 
@@ -179,7 +180,7 @@ func parseTokenExpiryGracePeriod() (time.Duration, error) {
 	var err error
 	expiryGracePeriod := defaultTokenExpiryGracePeriod
 
-	expiryGracePeriodString := os.Getenv(tokenExpiryGracePeriodEnv)
+	expiryGracePeriodString := strings.TrimSpace(os.Getenv(tokenExpiryGracePeriodEnv))
 	if expiryGracePeriodString != "" {
 		expiryGracePeriod, err = time.ParseDuration(expiryGracePeriodString)
 		if err != nil {

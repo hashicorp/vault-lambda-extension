@@ -1,12 +1,9 @@
 package vault
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
 	"github.com/hashicorp/vault/api"
@@ -48,7 +46,6 @@ func TestTokenRenewal(t *testing.T) {
 	stsServer := ststest.FakeSTS(ses)
 	defer stsServer.Close()
 
-	nullLogger := log.New(ioutil.Discard, "", 0)
 	generateVaultClient := func() *api.Client {
 		vaultClient, err := api.NewClient(&api.Config{
 			Address: vault.URL,
@@ -141,7 +138,7 @@ func TestTokenRenewal(t *testing.T) {
 		vaultRequests = []*http.Request{}
 		c := Client{
 			VaultClient: generateVaultClient(),
-			logger:      nullLogger,
+			logger:      hclog.Default(),
 
 			tokenExpiry: time.Now().Add(time.Hour),
 		}
@@ -155,7 +152,7 @@ func TestTokenRenewal(t *testing.T) {
 		vaultRequests = []*http.Request{}
 		c := Client{
 			VaultClient: generateVaultClient(),
-			logger:      nullLogger,
+			logger:      hclog.Default(),
 			stsSvc:      stsSvc,
 			authConfig: config.AuthConfig{
 				Provider: "aws",
@@ -178,7 +175,7 @@ func TestTokenRenewal(t *testing.T) {
 		vaultRequests = []*http.Request{}
 		c := Client{
 			VaultClient: generateVaultClient(),
-			logger:      nullLogger,
+			logger:      hclog.Default(),
 			stsSvc:      stsSvc,
 			authConfig: config.AuthConfig{
 				Provider: "aws",
@@ -199,7 +196,7 @@ func TestTokenRenewal(t *testing.T) {
 		vaultClient.SetToken(t.Name())
 		c := Client{
 			VaultClient: vaultClient,
-			logger:      nullLogger,
+			logger:      hclog.Default(),
 			stsSvc:      stsSvc,
 
 			tokenRenewable: true,
@@ -228,10 +225,9 @@ func TestTokenRenewal(t *testing.T) {
 		vaultRequests = []*http.Request{}
 		vaultClient := generateVaultClient()
 		vaultClient.SetToken(t.Name())
-		loggerBuffer := bytes.Buffer{}
 		c := Client{
 			VaultClient: vaultClient,
-			logger:      log.New(&loggerBuffer, "", 0),
+			logger:      hclog.Default(),
 			stsSvc:      stsSvc,
 
 			tokenRenewable: true,
@@ -249,8 +245,6 @@ func TestTokenRenewal(t *testing.T) {
 		require.Equal(t, t.Name(), token)
 		require.Equal(t, 1, len(vaultRequests))
 		require.Equal(t, "/v1/auth/token/renew-self", vaultRequests[0].URL.Path)
-
-		require.Contains(t, loggerBuffer.String(), "failed to renew")
 	})
 
 	t.Run("TestToken_NoRenewRequestIfNotRenewable", func(t *testing.T) {
@@ -259,7 +253,7 @@ func TestTokenRenewal(t *testing.T) {
 		vaultClient.SetToken(t.Name())
 		c := Client{
 			VaultClient: vaultClient,
-			logger:      nullLogger,
+			logger:      hclog.Default(),
 			stsSvc:      stsSvc,
 
 			tokenRenewable: false,
