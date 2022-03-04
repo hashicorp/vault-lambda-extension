@@ -99,7 +99,7 @@ func proxyHandler(logger hclog.Logger, client *vault.Client, cache *Cache) func(
 
 		if doCacheSet && resp.StatusCode < 300 {
 			cache.Set(cacheKeyHash, retrieveData(resp, respBody))
-			logger.Debug("Refreshed cache for: %s %s", r.Method, r.URL.Path)
+			logger.Debug(fmt.Sprintf("Refreshed cache for: %s %s", r.Method, r.URL.Path))
 		}
 
 		copyHeaders(w.Header(), resp.Header)
