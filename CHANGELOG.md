@@ -1,5 +1,13 @@
 ## Unreleased
 
+CHANGES:
+
+* Logging is now levelled and less chatty by default. Level can be controlled by VAULT_LOG_LEVEL environment variable. [[GH-63](https://github.com/hashicorp/vault-lambda-extension/pull/63)]
+
+IMPROVEMENTS:
+
+* Leading and trailing whitespace is trimmed from environment variable values on reading. [[GH-63](https://github.com/hashicorp/vault-lambda-extension/pull/63)]
+
 ## 0.5.0 (August 24, 2021)
 
 FEATURES:

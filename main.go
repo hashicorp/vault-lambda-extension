@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/extension"
 	"github.com/hashicorp/vault-lambda-extension/internal/proxy"
@@ -27,21 +27,35 @@ import (
 
 const (
 	extensionName = "vault-lambda-extension"
+	vaultLogLevel = "VAULT_LOG_LEVEL" // Optional, one of TRACE, DEBUG, INFO, WARN, ERROR, OFF
 )
 
 func main() {
-	logger := log.New(os.Stderr, fmt.Sprintf("[%s] ", extensionName), log.Ldate|log.Ltime|log.LUTC)
+	logger := hclog.New(&hclog.LoggerOptions{
+		Level: hclog.LevelFromString(os.Getenv(vaultLogLevel)),
+	})
+
+	err := realMain(logger.Named(extensionName))
+	if err != nil {
+		logger.Error("Fatal error, exiting", "error", err)
+		os.Exit(1)
+	}
+}
+
+func realMain(logger hclog.Logger) error {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	extensionClient := extension.NewClient(os.Getenv("AWS_LAMBDA_RUNTIME_API"))
 	_, err := extensionClient.Register(ctx, extensionName)
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
 
 	var wg sync.WaitGroup
 	srv, err := runExtension(ctx, logger, &wg)
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
 
 	shutdownChannel := make(chan struct{})
@@ -52,15 +66,15 @@ func main() {
 		signal.Notify(interruptChannel, syscall.SIGTERM, syscall.SIGINT)
 		select {
 		case s := <-interruptChannel:
-			logger.Printf("Received %s, exiting\n", s)
+			logger.Info("Received signal, exiting", "signal", s)
 		case <-shutdownChannel:
-			logger.Println("Received shutdown event, exiting")
+			logger.Info("Received shutdown event, exiting")
 		}
 
 		cancel()
 		if err := srv.Shutdown(context.Background()); err != nil {
 			// Error from closing listeners, or context timeout:
-			logger.Printf("HTTP server shutdown error: %s\n", err)
+			logger.Error("HTTP server shutdown error", "error", err)
 		}
 	}()
 
@@ -71,11 +85,13 @@ func main() {
 
 	// Ensure we wait for the HTTP server to gracefully shut down.
 	wg.Wait()
-	logger.Println("Graceful shutdown complete")
+	logger.Info("Graceful shutdown complete")
+
+	return nil
 }
 
-func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (*http.Server, error) {
-	logger.Println("Initialising")
+func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) (*http.Server, error) {
+	logger.Info("Initialising")
 
 	authConfig := config.AuthConfigFromEnv()
 	vaultConfig := api.DefaultConfig()
@@ -100,7 +116,7 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 	} else {
 		ses = session.Must(session.NewSession())
 	}
-	client, err := vault.NewClient(logger, vaultConfig, authConfig, ses)
+	client, err := vault.NewClient(logger.Named("vault-client"), vaultConfig, authConfig, ses)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
@@ -129,18 +145,18 @@ func runExtension(ctx context.Context, logger *log.Logger, wg *sync.WaitGroup) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
 	}
-	srv := proxy.New(logger, client, config.CacheConfigFromEnv())
+	srv := proxy.New(logger.Named("proxy"), client, config.CacheConfigFromEnv())
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		logger.Println("Starting HTTP server")
+		logger.Info("Starting HTTP proxy server")
 		err = srv.Serve(ln)
 		if err != http.ErrServerClosed {
-			logger.Printf("HTTP server shutdown unexpectedly: %s\n", err)
+			logger.Error("HTTP server shutdown unexpectedly", "error", err)
 		}
 	}()
 
-	logger.Println("Initialised")
+	logger.Info("Initialised")
 
 	return srv, nil
 }
@@ -183,19 +199,19 @@ func writePreconfiguredSecrets(client *api.Client) error {
 // required in the Extension API.
 // The first call to NextEvent signals completion of the extension
 // init phase.
-func processEvents(ctx context.Context, logger *log.Logger, extensionClient *extension.Client) {
+func processEvents(ctx context.Context, logger hclog.Logger, extensionClient *extension.Client) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			logger.Println("Waiting for event...")
+			logger.Info("Waiting for event...")
 			res, err := extensionClient.NextEvent(ctx)
 			if err != nil {
-				logger.Printf("Error receiving event: %s\n", err)
+				logger.Error("Error receiving event", "error", err)
 				return
 			}
-			logger.Println("Received event")
+			logger.Info("Received event")
 			// Exit if we receive a SHUTDOWN event
 			if res.EventType == extension.Shutdown {
 				return

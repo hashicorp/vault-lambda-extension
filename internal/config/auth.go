@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 )
 
 const (
@@ -24,10 +25,10 @@ type AuthConfig struct {
 // AuthConfigFromEnv reads config from the environment for authenticating to Vault.
 func AuthConfigFromEnv() AuthConfig {
 	return AuthConfig{
-		Role:              os.Getenv(vaultAuthRole),
-		Provider:          os.Getenv(vaultAuthProvider),
-		IAMServerID:       os.Getenv(vaultIAMServerID),
-		STSEndpointRegion: os.Getenv(stsEndpointRegionEnv),
-		VaultAddress:      os.Getenv(vleVaultAddr),
+		Role:              strings.TrimSpace(os.Getenv(vaultAuthRole)),
+		Provider:          strings.TrimSpace(os.Getenv(vaultAuthProvider)),
+		IAMServerID:       strings.TrimSpace(os.Getenv(vaultIAMServerID)),
+		STSEndpointRegion: strings.TrimSpace(os.Getenv(stsEndpointRegionEnv)),
+		VaultAddress:      strings.TrimSpace(os.Getenv(vleVaultAddr)),
 	}
 }

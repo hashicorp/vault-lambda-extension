@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/cryptoutil"
@@ -70,19 +70,19 @@ func NewCache(cc config.CacheConfig) *Cache {
 
 // constructs the CacheKey for this request and token and returns the SHA256
 // hash
-func makeRequestHash(logger *log.Logger, r *http.Request, token string) (string, error) {
+func makeRequestHash(logger hclog.Logger, r *http.Request, token string) (string, error) {
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		if r.Body != nil {
 			if err := r.Body.Close(); err != nil {
-				logger.Printf("error closing request body: %s", err)
+				logger.Error("error closing request body", "error", err)
 			}
 		}
 		return "", fmt.Errorf("failed to read request body: %w", err)
 	}
 	if r.Body != nil {
 		if err := r.Body.Close(); err != nil {
-			logger.Printf("error closing request body: %s", err)
+			logger.Error("error closing request body", "error", err)
 		}
 	}
 	r.Body = ioutil.NopCloser(bytes.NewReader(reqBody))
