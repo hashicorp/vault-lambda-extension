@@ -57,12 +57,6 @@ for i in `seq 15`; do
     sleep 1
 done
 
-# Ensure we got some log messages about renewing and having to re-auth
-{
-    cat /tmp/vault-lambda-extension.log | grep "authenticating to Vault"
-    cat /tmp/vault-lambda-extension.log | grep "renewing Vault token"
-} > /dev/null
-
 # Tell the API that we're ready for it to send the SHUTDOWN event to the extension.
 echo "Signalling shutdown to extension"
 curl --silent --request POST api:80/_sync/shutdown-extension

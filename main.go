@@ -31,9 +31,8 @@ const (
 )
 
 func main() {
-	hclog.LevelFromString(os.Getenv(vaultLogLevel))
 	logger := hclog.New(&hclog.LoggerOptions{
-		Level: hclog.Debug,
+		Level: hclog.LevelFromString(os.Getenv(vaultLogLevel)),
 	})
 
 	err := realMain(logger.Named(extensionName))
