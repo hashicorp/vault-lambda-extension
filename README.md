@@ -15,7 +15,7 @@ read secrets from your Vault deployment.
 To use the extension, include the following ARN as a layer in your Lambda function:
 
 ```text
-arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:11
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:12
 ```
 
 Where region may be any of `af-south-1`, `ap-east-1`, `ap-northeast-1`,
@@ -80,7 +80,7 @@ If you deploy your Lambda function as a zip file, you can add the extension
 to your Lambda layers using the console or [cli][lambda-add-layer-cli]:
 
 ```text
-arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:11
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:12
 ```
 
 #### 2. Option b) Install the extension for Lambda functions packaged in container images
