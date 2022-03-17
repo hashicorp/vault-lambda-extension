@@ -173,6 +173,7 @@ Environment variable    | Description | Required | Example value
 `VAULT_NAMESPACE`       | The namespace to use for pre-configured secrets. Ignored by proxy server | No | `education`
 `VAULT_DEFAULT_CACHE_TTL` | The time to live configuration (aka, TTL) of the cache used by proxy server. Must have a unit and be parsable as a time.Duration. Required for caching to be enabled. | No | `15m`
 `VAULT_DEFAULT_CACHE_ENABLED` | Enable caching for all requests, without needing to set the X-Vault-Cache-Control header for each request. Must be set to a boolean value. | No | `true`
+`VAULT_SECRET_DATA_JSON` | If set to `true`, the extension will return just the data portion of the secret, instead of the entire nested JSON structure. | No | `true`
 
 ### AWS STS client configuration
 
