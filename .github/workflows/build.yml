@@ -1,14 +1,6 @@
 name: build
 
-on:
-  push:
-    branches: ["*"]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to build, e.g. 0.1.0"
-        type: string
-        required: false
+on: [push, workflow_dispatch]
 
 env:
   PKG_NAME: "vault-lambda-extension"
