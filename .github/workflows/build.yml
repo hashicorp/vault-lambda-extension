@@ -1,6 +1,15 @@
 name: build
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, e.g. 0.1.0"
+        type: string
+        required: false
 
 env:
   PKG_NAME: "vault-lambda-extension"
@@ -80,9 +89,8 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           make build
-          cd pkg
           mkdir out
-          zip -r out/${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip extensions
+          zip -r -j out/${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip pkg/extensions
 
       - uses: actions/upload-artifact@v2
         with:
