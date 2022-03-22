@@ -19,6 +19,8 @@ jobs:
 
   golangci:
     name: lint
+    needs:
+      - get-go-version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v2
@@ -37,6 +39,8 @@ jobs:
             --enable govet
 
   gomod:
+    needs:
+        - get-go-version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v2
