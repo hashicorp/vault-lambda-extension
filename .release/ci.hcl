@@ -101,6 +101,15 @@ event "promote-staging" {
   }
 }
 
+event "promote-layer-staging" {
+  depends = ["promote-staging"]
+  action "promote-layer-staging" {
+    organization = "hashicorp"
+    repository = "vault-lambda-extension-release"
+    workflow = "promote-layer-staging"
+  }
+}
+
 event "trigger-production" {
 // This event is dispatched by the bob trigger-promotion command
 // and is required - do not delete.
@@ -116,5 +125,14 @@ event "promote-production" {
 
   notification {
     on = "always"
+  }
+}
+
+event "promote-layer-production" {
+  depends = ["promote-production"]
+  action "promote-layer-production" {
+    organization = "hashicorp"
+    repository = "vault-lambda-extension-release"
+    workflow = "promote-layer-production"
   }
 }
