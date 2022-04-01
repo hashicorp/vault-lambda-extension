@@ -46,12 +46,6 @@ func realMain(logger hclog.Logger) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	extensionClient := extension.NewClient(os.Getenv("AWS_LAMBDA_RUNTIME_API"))
-	_, err := extensionClient.Register(ctx, extensionName)
-	if err != nil {
-		return err
-	}
-
 	var wg sync.WaitGroup
 	srv, err := runExtension(ctx, logger, &wg)
 	if err != nil {
@@ -77,6 +71,12 @@ func realMain(logger hclog.Logger) error {
 			logger.Error("HTTP server shutdown error", "error", err)
 		}
 	}()
+
+	extensionClient := extension.NewClient(os.Getenv("AWS_LAMBDA_RUNTIME_API"))
+	_, err = extensionClient.Register(ctx, extensionName)
+	if err != nil {
+		return err
+	}
 
 	processEvents(ctx, logger, extensionClient)
 
