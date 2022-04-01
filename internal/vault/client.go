@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -93,8 +95,37 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 
 // login authenticates to Vault using IAM auth, and sets the client's token.
 func (c *Client) login(ctx context.Context) error {
+
+	authConfig := config.AuthConfigFromEnv()
+	roleToAssumeArn := authConfig.AssumedRoleArn
+
+	stsSvc := c.stsSvc
+	if roleToAssumeArn == "" {
+		c.logger.Debug("Assumed Role Arn: ", roleToAssumeArn)
+
+		sessionName := "vault_auth"
+
+		result, err := c.stsSvc.AssumeRole(&sts.AssumeRoleInput{
+			RoleArn:         &roleToAssumeArn,
+			RoleSessionName: &sessionName,
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to assume role: %s", roleToAssumeArn)
+		}
+
+		c.logger.Debug("Expiration Time: ", result.Credentials.Expiration.String())
+
+		sess, err := session.NewSession(&aws.Config{
+			Region:      aws.String(authConfig.STSEndpointRegion),
+			Credentials: credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
+		})
+
+		stsSvc = sts.New(sess)
+	}
+
 	// ignore out
-	req, _ := c.stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
+	req, _ := stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
 	req.SetContext(ctx)
 
 	if c.authConfig.IAMServerID != "" {

@@ -8,6 +8,7 @@ import (
 const (
 	vaultAuthRole        = "VAULT_AUTH_ROLE"
 	vaultAuthProvider    = "VAULT_AUTH_PROVIDER"
+	vaultAssumedRoleArn  = "VAULT_ASSUMED_ROLE_ARN"    // Optional
 	vaultIAMServerID     = "VAULT_IAM_SERVER_ID"       // Optional
 	vleVaultAddr         = "VLE_VAULT_ADDR"            // Optional, overrides VAULT_ADDR
 	stsEndpointRegionEnv = "VAULT_STS_ENDPOINT_REGION" // Optional
@@ -17,6 +18,7 @@ const (
 type AuthConfig struct {
 	Role              string
 	Provider          string
+	AssumedRoleArn    string
 	IAMServerID       string
 	STSEndpointRegion string
 	VaultAddress      string
@@ -27,6 +29,7 @@ func AuthConfigFromEnv() AuthConfig {
 	return AuthConfig{
 		Role:              strings.TrimSpace(os.Getenv(vaultAuthRole)),
 		Provider:          strings.TrimSpace(os.Getenv(vaultAuthProvider)),
+		AssumedRoleArn:    strings.TrimSpace(os.Getenv(vaultAssumedRoleArn)),
 		IAMServerID:       strings.TrimSpace(os.Getenv(vaultIAMServerID)),
 		STSEndpointRegion: strings.TrimSpace(os.Getenv(stsEndpointRegionEnv)),
 		VaultAddress:      strings.TrimSpace(os.Getenv(vleVaultAddr)),
