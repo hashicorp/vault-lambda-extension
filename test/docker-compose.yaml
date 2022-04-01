@@ -25,6 +25,7 @@ services:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       - AWS_SESSION_TOKEN
+      - VAULT_LOG_LEVEL
   vault:
     image: docker.mirror.hashicorp.services/vault:1.6.2
     command: vault server -dev -log-level=err

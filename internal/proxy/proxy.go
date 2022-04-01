@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/sdk/helper/consts"
@@ -16,14 +16,10 @@ import (
 
 const (
 	VaultCacheControlHeaderName = "X-Vault-Cache-Control"
-
-	// Note: remove these definitions once they're available in Vault's api package
-	VaultInconsistentHeaderName = "X-Vault-Inconsistent"
-	VaultForwardHeaderName      = "X-Vault-Forward"
 )
 
 // New returns an unstarted HTTP server with health and proxy handlers.
-func New(logger *log.Logger, client *vault.Client, cacheConfig config.CacheConfig) *http.Server {
+func New(logger hclog.Logger, client *vault.Client, cacheConfig config.CacheConfig) *http.Server {
 	cache := setupCache(cacheConfig)
 	mux := http.ServeMux{}
 	mux.HandleFunc("/", proxyHandler(logger, client, cache))
@@ -36,7 +32,7 @@ func New(logger *log.Logger, client *vault.Client, cacheConfig config.CacheConfi
 
 // The proxyHandler borrows from the Send function in Vault Agent's proxy:
 // https://github.com/hashicorp/vault/blob/22b486b651b8956d32fb24e77cef4050df7094b6/command/agent/cache/api_proxy.go
-func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(http.ResponseWriter, *http.Request) {
+func proxyHandler(logger hclog.Logger, client *vault.Client, cache *Cache) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, err := client.Token(r.Context())
 		if err != nil {
@@ -44,7 +40,7 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 			return
 		}
 
-		logger.Printf("Proxying %s %s\n", r.Method, r.URL.Path)
+		logger.Debug(fmt.Sprintf("Proxying %s %s", r.Method, r.URL.Path))
 		fwReq, err := proxyRequest(r, client.VaultConfig.Address, token)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to generate proxy request: %s", err), http.StatusInternalServerError)
@@ -61,7 +57,7 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 			// Construct the hash for this request to use as the cache key
 			cacheKeyHash, err = makeRequestHash(logger, r, token)
 			if err != nil {
-				logger.Printf("failed to compute request hash: %s", err)
+				logger.Error("failed to compute request hash", "error", err)
 				http.Error(w, "failed to read request", http.StatusInternalServerError)
 				return
 			}
@@ -75,10 +71,10 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 			// Check the cache for this request
 			data, err := cache.Get(cacheKeyHash)
 			if err != nil {
-				logger.Printf("failed to fetch from cache: %s", err)
+				logger.Error("failed to fetch from cache", "error", err)
 			}
 			if data != nil {
-				logger.Printf("Cache hit for: %s %s", r.Method, r.URL.Path)
+				logger.Debug(fmt.Sprintf("Cache hit for: %s %s", r.Method, r.URL.Path))
 				fetchFromCache(w, data)
 				return
 			}
@@ -103,7 +99,7 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 
 		if doCacheSet && resp.StatusCode < 300 {
 			cache.Set(cacheKeyHash, retrieveData(resp, respBody))
-			logger.Printf("Refreshed cache for: %s %s", r.Method, r.URL.Path)
+			logger.Debug(fmt.Sprintf("Refreshed cache for: %s %s", r.Method, r.URL.Path))
 		}
 
 		copyHeaders(w.Header(), resp.Header)
@@ -115,7 +111,7 @@ func proxyHandler(logger *log.Logger, client *vault.Client, cache *Cache) func(h
 			return
 		}
 
-		logger.Printf("Successfully proxied %s %s\n", r.Method, r.URL.Path)
+		logger.Debug(fmt.Sprintf("Successfully proxied %s %s", r.Method, r.URL.Path))
 	}
 }
 

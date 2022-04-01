@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/consts"
@@ -48,9 +48,9 @@ func TestCache_computeRequestID(t *testing.T) {
 						Path: "test",
 					},
 					Header: http.Header{
-						api.HeaderIndex:             []string{"foo"},
-						VaultInconsistentHeaderName: []string{"foo"},
-						VaultForwardHeaderName:      []string{"foo"},
+						api.HeaderIndex:        []string{"foo"},
+						api.HeaderInconsistent: []string{"foo"},
+						api.HeaderForward:      []string{"foo"},
 					},
 				},
 			},
@@ -92,9 +92,9 @@ func TestCache_computeRequestID_moreTests(t *testing.T) {
 					Path: "test",
 				},
 				Header: http.Header{
-					api.HeaderIndex:             []string{"foo"},
-					VaultInconsistentHeaderName: []string{"foo"},
-					VaultForwardHeaderName:      []string{"foo"},
+					api.HeaderIndex:        []string{"foo"},
+					api.HeaderInconsistent: []string{"foo"},
+					api.HeaderForward:      []string{"foo"},
 				},
 			},
 		}
@@ -198,7 +198,7 @@ func Test_makeRequestHash(t *testing.T) {
 		},
 	}
 
-	h, err := makeRequestHash(log.Default(), req, "blue")
+	h, err := makeRequestHash(hclog.Default(), req, "blue")
 	assert.NoError(t, err)
 	assert.Equal(t, "b62adf8925f91450ee992596dd2fb38edb0d3270ed9edc23b98bf5f322e9ed9a", h)
 }

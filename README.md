@@ -15,7 +15,7 @@ read secrets from your Vault deployment.
 To use the extension, include the following ARN as a layer in your Lambda function:
 
 ```text
-arn:aws:lambda:us-east-1:634166935893:layer:vault-lambda-extension:11
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:12
 ```
 
 Where region may be any of `af-south-1`, `ap-east-1`, `ap-northeast-1`,
@@ -80,7 +80,7 @@ If you deploy your Lambda function as a zip file, you can add the extension
 to your Lambda layers using the console or [cli][lambda-add-layer-cli]:
 
 ```text
-arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:11
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:12
 ```
 
 #### 2. Option b) Install the extension for Lambda functions packaged in container images
@@ -152,6 +152,7 @@ Environment variable              | Description | Required | Example value
 `VAULT_SECRET_FILE_FOO`           | Must exist for any correspondingly named `VAULT_SECRET_PATH_FOO`. Name has no further effect beyond matching to the correct path variable | No | `/tmp/token`
 `VAULT_TOKEN_EXPIRY_GRACE_PERIOD` | Period at the end of the proxy server's auth token TTL where it will consider the token expired and attempt to re-authenticate to Vault. Must have a unit and be parseable by `time.Duration`. Defaults to 10s. | No | `1m`
 `VAULT_STS_ENDPOINT_REGION`       | The region of the STS regional endpoint to authenticate with. If the AWS IAM auth mount specified uses a regional STS endpoint, then this needs to match the region of that endpoint. Defaults to using the global endpoint, or the region the Lambda resides in if `AWS_STS_REGIONAL_ENDPOINTS` is set to `regional` | No | `eu-west-1`
+`VAULT_LOG_LEVEL`                 | Log level, one of TRACE, DEBUG, INFO, WARN, ERROR, OFF. Defaults to INFO. | No | `DEBUG`
 
 The remaining environment variables are not required, and function exactly as
 described in the [Vault Commands (CLI)][vault-env-vars] documentation. However,

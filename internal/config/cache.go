@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -26,7 +27,7 @@ type CacheConfig struct {
 // CacheConfigFromEnv reads config from the environment for caching
 func CacheConfigFromEnv() CacheConfig {
 	var cacheTTL time.Duration
-	cacheTTLEnv := os.Getenv(VaultCacheTTL)
+	cacheTTLEnv := strings.TrimSpace(os.Getenv(VaultCacheTTL))
 	if cacheTTLEnv != "" {
 		var err error
 		cacheTTL, err = time.ParseDuration(cacheTTLEnv)
@@ -36,7 +37,7 @@ func CacheConfigFromEnv() CacheConfig {
 	}
 
 	defaultOn := false
-	defaultOnEnv := os.Getenv(VaultCacheEnabled)
+	defaultOnEnv := strings.TrimSpace(os.Getenv(VaultCacheEnabled))
 	if defaultOnEnv != "" {
 		var err error
 		defaultOn, err = strconv.ParseBool(defaultOnEnv)
