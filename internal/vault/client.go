@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -100,13 +101,14 @@ func (c *Client) login(ctx context.Context) error {
 	roleToAssumeArn := authConfig.AssumedRoleArn
 
 	stsSvc := c.stsSvc
-	if roleToAssumeArn == "" {
-		c.logger.Debug("Assumed Role Arn: ", roleToAssumeArn)
+	if roleToAssumeArn != "" {
+
+		c.logger.Debug(fmt.Sprintf("Assumed Role Arn: %s", roleToAssumeArn))
 
 		sessionName := "vault_auth"
 
 		result, err := c.stsSvc.AssumeRole(&sts.AssumeRoleInput{
-			RoleArn:         &roleToAssumeArn,
+			RoleArn: &roleToAssumeArn,
 			RoleSessionName: &sessionName,
 		})
 
@@ -114,14 +116,22 @@ func (c *Client) login(ctx context.Context) error {
 			return fmt.Errorf("failed to assume role: %s", roleToAssumeArn)
 		}
 
-		c.logger.Debug("Expiration Time: ", result.Credentials.Expiration.String())
+		c.logger.Debug(fmt.Sprintf("Token Expiration Time: %s ", result.Credentials.Expiration.String()))
 
-		sess, err := session.NewSession(&aws.Config{
-			Region:      aws.String(authConfig.STSEndpointRegion),
-			Credentials: credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
-		})
+		var ses *session.Session
+		if authConfig.STSEndpointRegion != "" {
+			ses = session.Must(session.NewSession(&aws.Config{
+				Region: aws.String(authConfig.STSEndpointRegion),
+				STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
+				Credentials: credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
+			}))
+		} else {
+			ses = session.Must(session.NewSession(&aws.Config{
+				Credentials: credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
+			}))
+		}
 
-		stsSvc = sts.New(sess)
+		stsSvc = sts.New(ses)
 	}
 
 	// ignore out
