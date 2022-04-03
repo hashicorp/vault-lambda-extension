@@ -5,14 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
@@ -101,29 +102,32 @@ func (c *Client) login(ctx context.Context) error {
 	roleToAssumeArn := authConfig.AssumedRoleArn
 
 	stsSvc := c.stsSvc
+
+	/* If passing in a role (through VAULT_ASSUMED_ROLE_ARN enviornment variable)
+	to be assumed for Vault authentication, use it instead of the function execution role */
 	if roleToAssumeArn != "" {
 
-		c.logger.Debug(fmt.Sprintf("Assumed Role Arn: %s", roleToAssumeArn))
+		c.logger.Debug(fmt.Sprintf("Trying to assume role with arn of %s to authenticate with Vault", roleToAssumeArn))
 
 		sessionName := "vault_auth"
 
 		result, err := c.stsSvc.AssumeRole(&sts.AssumeRoleInput{
-			RoleArn: &roleToAssumeArn,
+			RoleArn:         &roleToAssumeArn,
 			RoleSessionName: &sessionName,
 		})
 
 		if err != nil {
-			return fmt.Errorf("failed to assume role: %s", roleToAssumeArn)
+			return fmt.Errorf("failed to assume role with arn of %s", roleToAssumeArn)
 		}
 
-		c.logger.Debug(fmt.Sprintf("Token Expiration Time: %s ", result.Credentials.Expiration.String()))
+		c.logger.Debug(fmt.Sprintf("Assumed role successfully with token expiration time: %s ", result.Credentials.Expiration.String()))
 
 		var ses *session.Session
 		if authConfig.STSEndpointRegion != "" {
 			ses = session.Must(session.NewSession(&aws.Config{
-				Region: aws.String(authConfig.STSEndpointRegion),
+				Region:              aws.String(authConfig.STSEndpointRegion),
 				STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
-				Credentials: credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
+				Credentials:         credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
 			}))
 		} else {
 			ses = session.Must(session.NewSession(&aws.Config{
