@@ -59,8 +59,6 @@ jobs:
     needs:
       - get-go-version
     runs-on: ubuntu-latest
-    env:
-      TEST_RESULTS_DIR: /tmp/test-results
     steps:
       - uses: actions/checkout@v2
 
@@ -83,5 +81,4 @@ jobs:
 
       - name: Test
         run: |
-          mkdir -p $TEST_RESULTS_DIR/go-test
           make test
