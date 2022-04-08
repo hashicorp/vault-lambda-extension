@@ -9,7 +9,7 @@ resource "aws_db_instance" "main" {
   engine                 = "postgres"
   engine_version         = "12.9"
   instance_class         = var.db_instance_type
-  name                   = "lambdadb"
+  db_name                = "lambdadb"
   username               = "vaultadmin"
   password               = random_password.password.result
   vpc_security_group_ids = [aws_security_group.rds.id]
