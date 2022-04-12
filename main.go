@@ -173,8 +173,12 @@ func writePreconfiguredSecrets(client *api.Client) error {
 		if err != nil {
 			return fmt.Errorf("error reading secret: %w", err)
 		}
-
-		content, err := json.MarshalIndent(secret, "", "  ")
+		var data interface{}
+		data = secret
+		if os.Getenv("VAULT_SECRET_DATA_JSON") == "true" {
+			data = secret.Data
+		}
+		content, err := json.MarshalIndent(data, "", "  ")
 		if err != nil {
 			return err
 		}
