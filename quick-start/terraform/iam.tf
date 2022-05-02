@@ -18,6 +18,7 @@ resource "aws_iam_role_policy" "vault-server" {
   policy = data.aws_iam_policy_document.vault-server.json
 }
 
+# Vault Client (Lambda function) IAM Config
 resource "aws_iam_role" "lambda" {
   name               = "${var.environment_name}-lambda-role"
   assume_role_policy = data.aws_iam_policy_document.assume_role_lambda.json
