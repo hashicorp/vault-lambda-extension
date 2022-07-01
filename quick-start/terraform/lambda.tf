@@ -6,7 +6,7 @@ resource "aws_lambda_function" "function" {
   handler       = "main"
   runtime       = "provided.al2"
   architectures = ["x86_64"]
-  layers        = ["arn:aws:lambda:${var.aws_region}:634166935893:layer:vault-lambda-extension:12"]
+  layers        = ["arn:aws:lambda:${var.aws_region}:634166935893:layer:vault-lambda-extension:13"]
 
   environment {
     variables = {
