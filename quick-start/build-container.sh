@@ -13,4 +13,4 @@ popd
 
 # Build the container to be uploaded to Lambda, which will build demo-function
 # from source and copy vault-lambda-extension into the correct folder.
-docker build --file "${DIR}/demo-function/Dockerfile" --tag demo-function "${DIR}/demo-function/"
+docker build --platform linux/amd64 --file "${DIR}/demo-function/Dockerfile" --tag demo-function "${DIR}/demo-function/"

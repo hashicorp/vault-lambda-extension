@@ -26,13 +26,26 @@ resource "aws_iam_instance_profile" "lambda" {
 
 resource "aws_iam_role" "lambda" {
   name               = "${var.environment_name}-lambda-role"
-  assume_role_policy = data.aws_iam_policy_document.assume_role_lambda.json
+  assume_role_policy = var.assume_role ? data.aws_iam_policy_document.assume_role_lambda_plus_root[0].json : data.aws_iam_policy_document.assume_role_lambda.json
+}
+
+resource "aws_iam_role" "extra_role" {
+  count              = var.assume_role ? 1 : 0
+  name               = "${var.environment_name}-extra-role"
+  assume_role_policy = data.aws_iam_policy_document.assume_role_lambda_plus_root[0].json
 }
 
 resource "aws_iam_role_policy" "lambda" {
   name   = "${var.environment_name}-lambda-policy"
   role   = aws_iam_role.lambda.id
-  policy = data.aws_iam_policy_document.lambda.json
+  policy = var.assume_role ? data.aws_iam_policy_document.lambda_plus_assume_role[0].json : data.aws_iam_policy_document.lambda.json
+}
+
+resource "aws_iam_role_policy" "extra_role_policy" {
+  count  = var.assume_role ? 1 : 0
+  name   = "${var.environment_name}-extra-role-policy"
+  role   = aws_iam_role.extra_role[0].id
+  policy = data.aws_iam_policy_document.lambda_plus_assume_role[0].json
 }
 
 //--------------------------------------------------------------------
@@ -58,6 +71,25 @@ data "aws_iam_policy_document" "assume_role_lambda" {
     principals {
       type        = "Service"
       identifiers = ["lambda.amazonaws.com"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "assume_role_lambda_plus_root" {
+  count = var.assume_role ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+
+    principals {
+      type = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
     }
   }
 }
@@ -109,6 +141,29 @@ data "aws_iam_policy_document" "lambda" {
       "logs:PutLogEvents"
     ]
 
+    resources = ["*"]
+  }
+}
+
+data "aws_iam_policy_document" "lambda_plus_assume_role" {
+  count = var.assume_role ? 1 : 0
+
+  statement {
+    sid    = "LambdaLogs"
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
     resources = ["*"]
   }
 }

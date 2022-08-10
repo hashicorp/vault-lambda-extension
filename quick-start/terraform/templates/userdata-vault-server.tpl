@@ -182,7 +182,7 @@ vault auth enable aws
 vault write -force auth/aws/config/client
 vault write auth/aws/role/${tpl_role_name} \
   auth_type=iam \
-  bound_iam_principal_arn="arn:aws:iam::${tpl_account_id}:role/${tpl_role_name}" \
+  bound_iam_principal_arn="${tpl_bound_role}" \
   policies=lambda-function \
   ttl=24h
 
