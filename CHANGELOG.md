@@ -1,8 +1,11 @@
 ## Unreleased
 
+## 0.7.0 (April 26, 2022)
+
 CHANGES:
 
 * Static function code can now reliably read secrets written to disk, because extension registration now occurs after writing files. [[GH-61](https://github.com/hashicorp/vault-lambda-extension/pull/61)]
+* arm64 architecture now supported [[GH-67](https://github.com/hashicorp/vault-lambda-extension/pull/67)]
 
 ## 0.6.0 (March 14, 2022)
 

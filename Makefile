@@ -1,10 +1,6 @@
 GOOS?=linux
 GOARCH?=amd64
-GOLANG_IMAGE?=docker.mirror.hashicorp.services/golang:1.17.7
 CI_TEST_ARGS=
-ifdef CI
-override CI_TEST_ARGS:=--junitfile=$(TEST_RESULTS_DIR)/go-test/results.xml --jsonfile=$(TEST_RESULTS_DIR)/go-test/results.json
-endif
 
 .PHONY: build lint test clean mod quick-start quick-start-destroy publish-layer-version
 
