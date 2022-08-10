@@ -117,7 +117,7 @@ func (c *Client) login(ctx context.Context) error {
 		})
 
 		if err != nil {
-			return fmt.Errorf("failed to assume role with arn of %s", roleToAssumeArn)
+			return fmt.Errorf("failed to assume role with arn of %s %w", roleToAssumeArn, err)
 		}
 
 		c.logger.Debug(fmt.Sprintf("Assumed role successfully with token expiration time: %s ", result.Credentials.Expiration.String()))
