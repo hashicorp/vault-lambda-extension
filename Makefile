@@ -10,7 +10,7 @@ build: clean
 		-ldflags '-s -w' \
 		-a -o pkg/extensions/vault-lambda-extension \
 		.
-	pushd pkg && zip -r vault-lambda-extension.zip extensions/ && popd
+	cd pkg && zip -r vault-lambda-extension.zip extensions/
 	echo "Extension built: pkg/vault-lambda-extension.zip"
 
 lint:
