@@ -11,6 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
+
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/hashicorp/go-hclog"
@@ -93,8 +97,49 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 
 // login authenticates to Vault using IAM auth, and sets the client's token.
 func (c *Client) login(ctx context.Context) error {
+
+	authConfig := config.AuthConfigFromEnv()
+	roleToAssumeArn := authConfig.AssumedRoleArn
+
+	stsSvc := c.stsSvc
+
+	/* If passing in a role (through VAULT_ASSUMED_ROLE_ARN enviornment variable)
+	to be assumed for Vault authentication, use it instead of the function execution role */
+	if roleToAssumeArn != "" {
+
+		c.logger.Debug(fmt.Sprintf("Trying to assume role with arn of %s to authenticate with Vault", roleToAssumeArn))
+
+		sessionName := "vault_auth"
+
+		result, err := c.stsSvc.AssumeRole(&sts.AssumeRoleInput{
+			RoleArn:         &roleToAssumeArn,
+			RoleSessionName: &sessionName,
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to assume role with arn of %s %w", roleToAssumeArn, err)
+		}
+
+		c.logger.Debug(fmt.Sprintf("Assumed role successfully with token expiration time: %s ", result.Credentials.Expiration.String()))
+
+		var ses *session.Session
+		if authConfig.STSEndpointRegion != "" {
+			ses = session.Must(session.NewSession(&aws.Config{
+				Region:              aws.String(authConfig.STSEndpointRegion),
+				STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
+				Credentials:         credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
+			}))
+		} else {
+			ses = session.Must(session.NewSession(&aws.Config{
+				Credentials: credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
+			}))
+		}
+
+		stsSvc = sts.New(ses)
+	}
+
 	// ignore out
-	req, _ := c.stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
+	req, _ := stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
 	req.SetContext(ctx)
 
 	if c.authConfig.IAMServerID != "" {
