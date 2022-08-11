@@ -72,3 +72,10 @@ If you want to test changes to the lambda extension, you can build and deploy th
 make zip
 make quick-start TERRAFORM_ARGS="-var local_extension=true"
 ```
+
+There is also a terraform variable for using an additional IAM role for the Lambda to assume:
+
+```
+make zip
+make quick-start TERRAFORM_ARGS="-var local_extension=true -var assume_role=true"
+```
