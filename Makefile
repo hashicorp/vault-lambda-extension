@@ -13,7 +13,7 @@ build: clean
 
 zip: build
 	cd pkg && zip -r vault-lambda-extension.zip extensions/
-	echo "Extension built: pkg/vault-lambda-extension.zip"
+	@echo "Extension built: pkg/vault-lambda-extension.zip"
 
 lint:
 	golangci-lint run -v --concurrency 2 \
