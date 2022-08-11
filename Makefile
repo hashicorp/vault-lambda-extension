@@ -3,13 +3,15 @@ GOARCH?=amd64
 CI_TEST_ARGS=
 TERRAFORM_ARGS=
 
-.PHONY: build lint test clean mod quick-start quick-start-destroy publish-layer-version
+.PHONY: build zip lint test clean mod quick-start quick-start-destroy publish-layer-version
 
 build: clean
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build \
 		-ldflags '-s -w' \
 		-a -o pkg/extensions/vault-lambda-extension \
 		.
+
+zip: build
 	cd pkg && zip -r vault-lambda-extension.zip extensions/
 	echo "Extension built: pkg/vault-lambda-extension.zip"
 
@@ -46,7 +48,7 @@ quick-start-destroy:
 	cd quick-start/terraform && \
 		terraform destroy -auto-approve
 
-publish-layer-version: build
+publish-layer-version: zip
 	aws lambda publish-layer-version \
 		--layer-name "vault-lambda-extension" \
 		--zip-file "fileb://pkg/vault-lambda-extension.zip" \

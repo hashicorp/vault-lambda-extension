@@ -69,6 +69,6 @@ pricing.**
 If you want to test changes to the lambda extension, you can build and deploy the local version for testing with the Quick Start:
 
 ```sh
-make build
+make zip
 make quick-start TERRAFORM_ARGS="-var local_extension=true"
 ```
