@@ -63,3 +63,19 @@ pricing.**
 [vault-learn-guide]: https://learn.hashicorp.com/tutorials/vault/aws-lambda
 [vault-docs]: https://www.vaultproject.io/docs/platform/aws/lambda-extension
 [vault-aws-iam-auth]: https://www.vaultproject.io/docs/auth/aws
+
+## Testing
+
+If you want to test changes to the lambda extension, you can build and deploy the local version for testing with the Quick Start:
+
+```sh
+make zip
+make quick-start TERRAFORM_ARGS="-var local_extension=true"
+```
+
+There is also a terraform variable for using an additional IAM role for the Lambda to assume:
+
+```
+make zip
+make quick-start TERRAFORM_ARGS="-var local_extension=true -var assume_role=true"
+```
