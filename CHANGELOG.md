@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.8.0 (August 22, 2022)
+
 FEATURES:
 
 * `VAULT_ASSUMED_ROLE_ARN` can be used to specify a role for your lambda function to assume. [[GH-69](https://github.com/hashicorp/vault-lambda-extension/pull/69)]
