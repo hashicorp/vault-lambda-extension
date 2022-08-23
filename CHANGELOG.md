@@ -6,6 +6,14 @@ FEATURES:
 
 * `VAULT_ASSUMED_ROLE_ARN` can be used to specify a role for your lambda function to assume. [[GH-69](https://github.com/hashicorp/vault-lambda-extension/pull/69)]
 
+IMPROVEMENTS:
+
+* Bumped versions for the following dependencies with security vulnerabilities:
+  * golang.org/x/crypto to v0.0.0-20220817201139-bc19a97f63c8
+  * golang.org/x/net to v0.0.0-20220812174116-3211cb980234
+  * golang.org/x/sys to v0.0.0-20220818161305-2296e01440c6
+  * golang.org/x/text to v0.3.7
+
 ## 0.7.0 (April 26, 2022)
 
 CHANGES:
