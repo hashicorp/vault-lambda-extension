@@ -33,6 +33,9 @@ Where region may be any of `af-south-1`, `ap-east-1`, `ap-northeast-1`,
 `eu-west-1`, `eu-west-2`, `eu-west-3`, `me-south-1`, `sa-east-1`, `us-east-1`,
 `us-east-2`, `us-west-1`, `us-west-2`.
 
+Alternatively, you can download binaries for packaging into a container image
+[here][releases]. See the full [documentation page][vault-docs] for more details.
+
 The extension authenticates with Vault using [AWS IAM auth][vault-aws-iam-auth],
 and all configuration is supplied via environment variables. There are two methods
 to read secrets, which can both be used side-by-side:
@@ -60,10 +63,6 @@ that directory if you'd like to try out the extension from scratch. **Please
 note it will create real infrastructure with an associated cost as per AWS'
 pricing.**
 
-[vault-learn-guide]: https://learn.hashicorp.com/tutorials/vault/aws-lambda
-[vault-docs]: https://www.vaultproject.io/docs/platform/aws/lambda-extension
-[vault-aws-iam-auth]: https://www.vaultproject.io/docs/auth/aws
-
 ## Testing
 
 If you want to test changes to the lambda extension, you can build and deploy the local version for testing with the Quick Start:
@@ -79,3 +78,8 @@ There is also a terraform variable for using an additional IAM role for the Lamb
 make zip
 make quick-start TERRAFORM_ARGS="-var local_extension=true -var assume_role=true"
 ```
+
+[vault-learn-guide]: https://learn.hashicorp.com/tutorials/vault/aws-lambda
+[vault-docs]: https://developer.hashicorp.com/vault/docs/platform/aws/lambda-extension
+[vault-aws-iam-auth]: https://developer.hashicorp.com/vault/docs/auth/aws
+[releases]: https://releases.hashicorp.com/vault-lambda-extension/
