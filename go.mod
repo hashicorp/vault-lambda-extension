@@ -1,13 +1,13 @@
 module github.com/hashicorp/vault-lambda-extension
 
-go 1.17
+go 1.19
 
 require (
 	github.com/aws/aws-sdk-go v1.41.10
 	github.com/hashicorp/go-hclog v1.1.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/vault/api v1.9.0
-	github.com/hashicorp/vault/sdk v0.4.1
+	github.com/hashicorp/vault/sdk v0.8.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/stretchr/testify v1.7.0
 )
