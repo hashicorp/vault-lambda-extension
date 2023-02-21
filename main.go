@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime"
 	"sync"
 	"syscall"
 
@@ -26,8 +27,9 @@ import (
 )
 
 const (
-	extensionName = "vault-lambda-extension"
-	vaultLogLevel = "VAULT_LOG_LEVEL" // Optional, one of TRACE, DEBUG, INFO, WARN, ERROR, OFF
+	extensionName    = "vault-lambda-extension"
+	extensionVersion = "vDev"
+	vaultLogLevel    = "VAULT_LOG_LEVEL" // Optional, one of TRACE, DEBUG, INFO, WARN, ERROR, OFF
 )
 
 func main() {
@@ -139,7 +141,7 @@ func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) 
 	}
 
 	// clear out eventual consistency helpers
-	client.VaultClient = client.VaultClient.WithRequestCallbacks().WithResponseCallbacks()
+	client.VaultClient = client.VaultClient.WithRequestCallbacks(vault.UserAgentRequestCallback(userAgent())).WithResponseCallbacks()
 
 	ln, err := net.Listen("tcp", "127.0.0.1:8200")
 	if err != nil {
@@ -218,4 +220,10 @@ func processEvents(ctx context.Context, logger hclog.Logger, extensionClient *ex
 			}
 		}
 	}
+}
+
+// userAgent returns a user-agent-style string
+func userAgent() string {
+	// the DevEx team uses UAs that look like "vault-client-go/0.0.1 (Darwin arm64; Go go1.19.2)"
+	return fmt.Sprintf("%s/%s (%s %s; Go %s)", extensionName, extensionVersion, runtime.GOOS, runtime.GOARCH, runtime.Version())
 }

@@ -293,6 +293,43 @@ func TestParseTokenExpiryGracePeriod(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestUserAgentHeaderAddition(t *testing.T) {
+	vault := fakeVault()
+	generateVaultClient := func() *api.Client {
+		vaultClient, err := api.NewClient(&api.Config{
+			Address: vault.URL,
+		})
+		require.NoError(t, err)
+		return vaultClient
+	}
+
+	t.Run("Ensure request contains header if decorator set", func(t *testing.T) {
+		vaultRequests = []*http.Request{}
+		vaultClient := generateVaultClient()
+		vaultClient.SetToken(t.Name())
+		c := Client{
+			VaultClient: vaultClient,
+			logger:      hclog.Default(),
+			//stsSvc:      stsSvc,
+
+			tokenRenewable: true,
+			tokenExpiry:    time.Now().Add(time.Hour),
+			tokenTTL:       10 * time.Hour,
+		}
+		secretFunc = generateSecretFunc(t, []*api.Secret{
+			with10hLease,
+		})
+		c.VaultClient = c.VaultClient.WithRequestCallbacks(UserAgentRequestCallback("abcd"))
+
+		_, err := c.Token(context.Background())
+		require.NoError(t, err)
+
+		// validate request was set and the user agent is what we expect
+		require.Equal(t, 1, len(vaultRequests))
+		require.Equal(t, "abcd", vaultRequests[0].Header.Get("User-Agent"))
+	})
+}
+
 func fakeVault() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
