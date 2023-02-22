@@ -3,6 +3,7 @@
 ## 0.9.0 (February 22, 2023)
 
 IMPROVEMENTS:
+* Building with Go 1.19.6
 * Bumped versions for the following dependencies with security vulnerabilities:
   * github.com/hashicorp/vault/api v1.9.0
   * github.com/hashicorp/vault/sdk v0.8.1
