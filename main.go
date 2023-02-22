@@ -28,7 +28,7 @@ import (
 
 const (
 	extensionName    = "vault-lambda-extension"
-	extensionVersion = "vDev"
+	extensionVersion = "0.9.0"
 	vaultLogLevel    = "VAULT_LOG_LEVEL" // Optional, one of TRACE, DEBUG, INFO, WARN, ERROR, OFF
 )
 

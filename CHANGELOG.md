@@ -1,5 +1,8 @@
 ## Unreleased
 
+IMPROVEMENTS:
+* Requests from the extension to Vault now set the User-Agent field accordingly.
+
 ## 0.8.0 (August 22, 2022)
 
 FEATURES:
