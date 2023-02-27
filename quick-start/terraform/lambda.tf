@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 resource "aws_lambda_function" "function" {
   function_name = "${var.environment_name}-function"
   description   = "Demo Vault AWS Lambda extension"

@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 # Based on vanilla Dockerfile to build a Golang image from:
 # https://docs.aws.amazon.com/lambda/latest/dg/go-image.html
 # The main modification is to copy the extension binary into the image.
