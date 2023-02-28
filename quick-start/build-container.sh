@@ -1,4 +1,7 @@
 #!/bin/sh
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 # This script builds the demo-function and vault-lambda-extension into a Docker
 # container. Use if you would like to deploy the demo as an image instead of
 # a zip. See the quick-start readme for more details.

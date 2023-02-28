@@ -1,4 +1,7 @@
 #!/bin/sh
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 # This script is for local integration testing.
 # It simulates a basic version of how Lambda runs a function that includes extensions.
 

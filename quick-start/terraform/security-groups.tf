@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 resource "aws_security_group" "vault-server" {
   name        = "${var.environment_name}-vault-server-sg"
   description = "SSH and Internal Traffic"
