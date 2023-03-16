@@ -322,7 +322,7 @@ func TestUserAgentHeaderAddition(t *testing.T) {
 		secretFunc = generateSecretFunc(t, []*api.Secret{
 			with10hLease,
 		})
-		c.VaultClient = c.VaultClient.WithRequestCallbacks(UserAgentRequestCallback("abcd"))
+		c.VaultClient = c.VaultClient.WithRequestCallbacks(UserAgentRequestCallback(fakeUserAgent))
 
 		_, err := c.Token(context.Background())
 		require.NoError(t, err)
@@ -331,6 +331,10 @@ func TestUserAgentHeaderAddition(t *testing.T) {
 		require.Equal(t, 1, len(vaultRequests))
 		require.Equal(t, "abcd", vaultRequests[0].Header.Get("User-Agent"))
 	})
+}
+
+func fakeUserAgent(_ *api.Request) string {
+	return "abcd"
 }
 
 func fakeVault() *httptest.Server {
