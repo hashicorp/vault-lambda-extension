@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 FROM docker.mirror.hashicorp.services/vault:1.6.2 as vault
 
 FROM docker.mirror.hashicorp.services/golang:1.15-alpine3.13 as builder

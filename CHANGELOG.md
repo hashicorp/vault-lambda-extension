@@ -3,6 +3,17 @@
 IMPROVEMENTS:
 * Requests from the extension to Vault now set the User-Agent field accordingly.
 
+## 0.9.0 (February 23, 2023)
+
+IMPROVEMENTS:
+* Building with Go 1.19.6
+* Bumped versions for the following dependencies with security vulnerabilities:
+  * github.com/hashicorp/vault/api v1.9.0
+  * github.com/hashicorp/vault/sdk v0.8.1
+  * golang.org/x/net v0.7.0
+  * golang.org/x/sys v0.5.0
+  * golang.org/x/text v0.7.0
+
 ## 0.8.0 (August 22, 2022)
 
 FEATURES:
