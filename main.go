@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -141,7 +142,9 @@ func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) 
 	}
 
 	// clear out eventual consistency helpers
-	client.VaultClient = client.VaultClient.WithRequestCallbacks(vault.UserAgentRequestCallback(userAgent())).WithResponseCallbacks()
+	client.VaultClient = client.VaultClient.
+		WithRequestCallbacks(vault.UserAgentRequestCallback(createUserAgentFunc(nil, nil))).
+		WithResponseCallbacks()
 
 	ln, err := net.Listen("tcp", "127.0.0.1:8200")
 	if err != nil {
@@ -222,8 +225,19 @@ func processEvents(ctx context.Context, logger hclog.Logger, extensionClient *ex
 	}
 }
 
-// userAgent returns a user-agent-style string
-func userAgent() string {
-	// the DevEx team uses UAs that look like "vault-client-go/0.0.1 (Darwin arm64; Go go1.19.2)"
-	return fmt.Sprintf("%s/%s (%s %s; Go %s)", extensionName, extensionVersion, runtime.GOOS, runtime.GOARCH, runtime.Version())
+// createUserAgentFunc returns a function that can generate a useragent string that will be attached to the request param.
+// This function has access to the config state of the program via closure.
+func createUserAgentFunc(_ *api.Config, _ *config.AuthConfig) func(request *api.Request) string {
+	return func(request *api.Request) string {
+		// the DevEx team uses UAs that look like "vault-client-go/0.0.1 (Darwin arm64; Go go1.19.2); (writing to temp; requesting via proxy)"
+		buf := bytes.NewBufferString(fmt.Sprintf("%s/%s (%s %s; Go %s)", extensionName, extensionVersion, runtime.GOOS, runtime.GOARCH, runtime.Version()))
+		if false {
+			buf.WriteString("; writing to temp file")
+		}
+		if request.URL.Host == "127.0.0.1" {
+			buf.WriteString("; requesting via proxy")
+		}
+
+		return buf.String()
+	}
 }

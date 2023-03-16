@@ -236,8 +236,10 @@ func parseTokenExpiryGracePeriod() (time.Duration, error) {
 	return expiryGracePeriod, nil
 }
 
-func UserAgentRequestCallback(agent string) api.RequestCallback {
+// UserAgentRequestCallback takes a function that returns a user agent string and will invoke that function to set
+// the user agent string on the request.
+func UserAgentRequestCallback(agentFunc func(request *api.Request) string) api.RequestCallback {
 	return func(req *api.Request) {
-		req.Headers.Set("User-Agent", agent)
+		req.Headers.Set("User-Agent", agentFunc(req))
 	}
 }
