@@ -120,7 +120,7 @@ func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) 
 	} else {
 		ses = session.Must(session.NewSession())
 	}
-	client, err := vault.NewClient(logger.Named("vault-client"), vaultConfig, authConfig, ses)
+	client, err := vault.NewClient(extensionName, extensionVersion, logger.Named("vault-client"), vaultConfig, authConfig, ses)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
