@@ -144,10 +144,10 @@ func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) 
 		return nil, err
 	}
 
-	// clear out eventual consistency helpers
+	// clear out eventual consistency helpers and add header mutation values
 	client.VaultClient = client.VaultClient.
 		WithRequestCallbacks(
-			vault.UserAgentRequestCallback(createUserAgentFunc(nil, nil))).
+			vault.UserAgentRequestCallback(createUserAgentFunc(vaultConfig, &authConfig))).
 		WithResponseCallbacks()
 
 	ln, err := net.Listen("tcp", "127.0.0.1:8200")
@@ -233,7 +233,7 @@ func processEvents(ctx context.Context, logger hclog.Logger, extensionClient *ex
 // This function has access to the config state of the program via closure.
 func createUserAgentFunc(_ *api.Config, _ *config.AuthConfig) func(request *api.Request) string {
 	return func(request *api.Request) string {
-		// the DevEx team uses UAs that look like "vault-client-go/0.0.1 (Darwin arm64; Go go1.19.2); (writing to temp; requesting via proxy)"
+		// the DevEx team uses UAs that look like "vault-client-go/0.0.1 (Darwin arm64; Go go1.19.2); writing to temp; requesting via proxy"
 		buf := bytes.NewBufferString(fmt.Sprintf("%s/%s (%s %s; Go %s)", extensionName, extensionVersion, runtime.GOOS, runtime.GOARCH, runtime.Version()))
 		if sec, err := config.ParseConfiguredSecrets(); err != nil && len(sec) > 0 {
 			buf.WriteString("; writing to temp file")
