@@ -296,6 +296,8 @@ func TestParseTokenExpiryGracePeriod(t *testing.T) {
 	require.Error(t, err)
 }
 
+const userAgent = "abcd"
+
 func TestUserAgentHeaderAddition(t *testing.T) {
 	vault := fakeVault()
 	generateVaultClient := func() *api.Client {
@@ -329,12 +331,12 @@ func TestUserAgentHeaderAddition(t *testing.T) {
 
 		// validate request was set and the user agent is what we expect
 		require.Equal(t, 1, len(vaultRequests))
-		require.Equal(t, "abcd", vaultRequests[0].Header.Get("User-Agent"))
+		require.Equal(t, userAgent, vaultRequests[0].Header.Get("User-Agent"))
 	})
 }
 
 func fakeUserAgent(_ *api.Request) string {
-	return "abcd"
+	return userAgent
 }
 
 func fakeVault() *httptest.Server {
