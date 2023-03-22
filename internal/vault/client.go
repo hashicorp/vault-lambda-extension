@@ -32,6 +32,9 @@ const (
 
 // Client holds api.Client and handles state required to renew tokens and re-auth as required.
 type Client struct {
+	Name    string
+	Version string
+
 	mtx sync.Mutex
 
 	VaultClient *api.Client

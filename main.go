@@ -4,7 +4,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,7 +14,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"runtime"
 	"sync"
 	"syscall"
 
@@ -137,18 +135,19 @@ func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) 
 		return nil, fmt.Errorf("error logging in to Vault: %w", err)
 	}
 
-	client.VaultClient = client.VaultClient.WithRequestCallbacks(api.RequireState(newState)).WithResponseCallbacks()
+	uaFunc := func(request *api.Request) string {
+		return config.GetUserAgentBase(extensionName, extensionVersion) + "; writing to temp file"
+	}
+
+	client.VaultClient = client.VaultClient.WithRequestCallbacks(api.RequireState(newState), vault.UserAgentRequestCallback(uaFunc)).WithResponseCallbacks()
 
 	err = writePreconfiguredSecrets(client.VaultClient)
 	if err != nil {
 		return nil, err
 	}
 
-	// clear out eventual consistency helpers and add header mutation values
-	client.VaultClient = client.VaultClient.
-		WithRequestCallbacks(
-			vault.UserAgentRequestCallback(createUserAgentFunc(vaultConfig, &authConfig))).
-		WithResponseCallbacks()
+	// clear out eventual consistency helpers
+	client.VaultClient = client.VaultClient.WithRequestCallbacks().WithResponseCallbacks()
 
 	ln, err := net.Listen("tcp", "127.0.0.1:8200")
 	if err != nil {
@@ -226,22 +225,5 @@ func processEvents(ctx context.Context, logger hclog.Logger, extensionClient *ex
 				return
 			}
 		}
-	}
-}
-
-// createUserAgentFunc returns a function that can generate a useragent string that will be attached to the request param.
-// This function has access to the config state of the program via closure.
-func createUserAgentFunc(_ *api.Config, _ *config.AuthConfig) func(request *api.Request) string {
-	return func(request *api.Request) string {
-		// the DevEx team uses UAs that look like "vault-client-go/0.0.1 (Darwin arm64; Go go1.19.2); writing to temp; requesting via proxy"
-		buf := bytes.NewBufferString(fmt.Sprintf("%s/%s (%s %s; Go %s)", extensionName, extensionVersion, runtime.GOOS, runtime.GOARCH, runtime.Version()))
-		if sec, err := config.ParseConfiguredSecrets(); err != nil && len(sec) > 0 {
-			buf.WriteString("; writing to temp file")
-		}
-		if request.URL.Host == "127.0.0.1" {
-			buf.WriteString("; requesting via proxy")
-		}
-
-		return buf.String()
 	}
 }
