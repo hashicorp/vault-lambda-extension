@@ -30,6 +30,7 @@ type vaultResponse struct {
 }
 
 var (
+	vaultRequests       []*http.Request
 	fakeVaultResponse   vaultResponse
 	vaultResponseFooBar = vaultResponse{
 		secret: &api.Secret{
@@ -69,9 +70,14 @@ func TestProxy(t *testing.T) {
 	defer close()
 
 	t.Run("happy path bare http client", func(t *testing.T) {
+		// reset request array
+		vaultRequests = []*http.Request{}
 		fakeVaultResponse = vaultResponseFooBar
 		resp, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", proxyAddr))
 
+		// the stored request should be the one _from the proxy_ since it's stored by
+		// the (fake) vault.
+		require.NotEmpty(t, vaultRequests[0].Header.Get("User-Agent"))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		defer resp.Body.Close()
@@ -83,12 +89,15 @@ func TestProxy(t *testing.T) {
 	})
 
 	t.Run("happy path with vault client", func(t *testing.T) {
+		vaultRequests = []*http.Request{}
 		fakeVaultResponse = vaultResponseFooBar
 		proxyVaultClient, err := api.NewClient(&api.Config{
 			Address: "http://" + proxyAddr,
 		})
 		require.NoError(t, err)
 		resp, err := proxyVaultClient.Logical().Read("secret/data/foo")
+
+		require.NotEmpty(t, vaultRequests[0].Header.Get("User-Agent"))
 		require.NoError(t, err)
 		require.Equal(t, "bar", resp.Data["foo"])
 	})
@@ -103,6 +112,7 @@ func TestProxy(t *testing.T) {
 	})
 
 	t.Run("failed upstream request should give 502", func(t *testing.T) {
+
 		fakeVaultResponse = vaultResponseFooBar
 		resp, err := http.Get(fmt.Sprintf("http://%s/FailedTransport", proxyAddr))
 		require.NoError(t, err)
@@ -130,6 +140,10 @@ func startProxy(t *testing.T, vaultAddress string, ses *session.Session) (string
 func fakeVault() *httptest.Server {
 	vaultResponsePtr := &fakeVaultResponse
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// after handling, save the request so we can inspect it in test cases
+		defer func() {
+			vaultRequests = append(vaultRequests, r)
+		}()
 		switch {
 		case strings.Contains(r.URL.Path, "login"):
 			b, err := json.Marshal(vaultLoginResponse)
