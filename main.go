@@ -28,18 +28,12 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
-const (
-	extensionName    = "vault-lambda-extension"
-	extensionVersion = "0.9.0"
-	vaultLogLevel    = "VAULT_LOG_LEVEL" // Optional, one of TRACE, DEBUG, INFO, WARN, ERROR, OFF
-)
-
 func main() {
 	logger := hclog.New(&hclog.LoggerOptions{
-		Level: hclog.LevelFromString(os.Getenv(vaultLogLevel)),
+		Level: hclog.LevelFromString(os.Getenv(config.VaultLogLevel)),
 	})
 
-	err := realMain(logger.Named(extensionName))
+	err := realMain(logger.Named(config.VaultLogLevel))
 	if err != nil {
 		logger.Error("Fatal error, exiting", "error", err)
 		os.Exit(1)
@@ -77,7 +71,7 @@ func realMain(logger hclog.Logger) error {
 	}()
 
 	extensionClient := extension.NewClient(os.Getenv("AWS_LAMBDA_RUNTIME_API"))
-	_, err = extensionClient.Register(ctx, extensionName)
+	_, err = extensionClient.Register(ctx, config.ExtensionName)
 	if err != nil {
 		return err
 	}
@@ -120,7 +114,7 @@ func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) 
 	} else {
 		ses = session.Must(session.NewSession())
 	}
-	client, err := vault.NewClient(extensionName, extensionVersion, logger.Named("vault-client"), vaultConfig, authConfig, ses)
+	client, err := vault.NewClient(config.ExtensionName, config.ExtensionVersion, logger.Named("vault-client"), vaultConfig, authConfig, ses)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
@@ -136,7 +130,7 @@ func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) 
 	}
 
 	uaFunc := func(request *api.Request) string {
-		return config.GetUserAgentBase(extensionName, extensionVersion) + "; writing to temp file"
+		return config.GetUserAgentBase(config.ExtensionName, config.ExtensionVersion) + "; writing to temp file"
 	}
 
 	client.VaultClient = client.VaultClient.WithRequestCallbacks(api.RequireState(newState), vault.UserAgentRequestCallback(uaFunc)).WithResponseCallbacks()
