@@ -77,7 +77,7 @@ func TestProxy(t *testing.T) {
 
 		// the stored request should be the one _from the proxy_ since it's stored by
 		// the (fake) vault.
-		require.NotEmpty(t, vaultRequests[0].Header.Get("User-Agent"))
+		require.Contains(t, vaultRequests[1].Header.Get("User-Agent"), proxyUserAgent)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		defer resp.Body.Close()
@@ -97,7 +97,7 @@ func TestProxy(t *testing.T) {
 		require.NoError(t, err)
 		resp, err := proxyVaultClient.Logical().Read("secret/data/foo")
 
-		require.NotEmpty(t, vaultRequests[0].Header.Get("User-Agent"))
+		require.Contains(t, vaultRequests[0].Header.Get("User-Agent"), proxyUserAgent)
 		require.NoError(t, err)
 		require.Equal(t, "bar", resp.Data["foo"])
 	})
@@ -124,7 +124,7 @@ func startProxy(t *testing.T, vaultAddress string, ses *session.Session) (string
 	vaultConfig := api.DefaultConfig()
 	require.NoError(t, vaultConfig.Error)
 	vaultConfig.Address = vaultAddress
-	client, err := vault.NewClient("", "", hclog.NewNullLogger(), vaultConfig, config.AuthConfig{}, ses)
+	client, err := vault.NewClient(hclog.NewNullLogger(), vaultConfig, config.AuthConfig{}, ses)
 	require.NoError(t, err)
 	client.VaultConfig.Address = vaultAddress
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
