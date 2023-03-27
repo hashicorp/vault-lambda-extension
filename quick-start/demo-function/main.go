@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -47,40 +46,50 @@ func handle(ctx context.Context, payload Payload) error {
 func handleRequest(ctx context.Context, payload Payload, logger *log.Logger) error {
 	logger.Println("Received:", payload.String())
 	logger.Println("Reading file /tmp/vault_secret.json")
-	secretRaw, err := ioutil.ReadFile("/tmp/vault_secret.json")
-	if err != nil {
-		return fmt.Errorf("error reading file: %w", err)
+
+	runMode := os.Getenv("VAULT_RUN_MODE")
+	logger.Println("VAULT_RUN_MODE", runMode)
+	if runMode == "" {
+		runMode = "default"
 	}
 
-	var secret api.Secret
-	err = json.Unmarshal(secretRaw, &secret)
-	if err != nil {
-		return err
+	if runMode == "default" || runMode == "file" {
+		secretRaw, err := os.ReadFile("/tmp/vault_secret.json")
+		if err != nil {
+			return fmt.Errorf("error reading file: %w", err)
+		}
+
+		var secret api.Secret
+		err = json.Unmarshal(secretRaw, &secret)
+		if err != nil {
+			return err
+		}
+
+		logger.Println("Querying users using credentials from disk")
+		err = readUsersFromDatabase(ctx, logger, &secret)
+		if err != nil {
+			logger.Println("Failed to read users from database", err)
+		}
 	}
 
-	logger.Println("Querying users using credentials from disk")
-	err = readUsersFromDatabase(ctx, logger, &secret)
-	if err != nil {
-		logger.Println("Failed to read users from database", err)
-	}
+	if runMode == "default" || runMode == "proxy" {
+		proxyClient, err := api.NewClient(&api.Config{
+			Address: "http://127.0.0.1:8200",
+		})
+		if err != nil {
+			return err
+		}
+		proxySecret, err := proxyClient.Logical().Read(os.Getenv("VAULT_SECRET_PATH_DB"))
+		if err != nil {
+			return err
+		}
 
-	proxyClient, err := api.NewClient(&api.Config{
-		Address: "http://127.0.0.1:8200",
-	})
-	if err != nil {
-		return err
+		logger.Println("Querying users using credentials from proxy")
+		err = readUsersFromDatabase(ctx, logger, proxySecret)
+		if err != nil {
+			logger.Println("Failed to read users from database", err)
+		}
 	}
-	proxySecret, err := proxyClient.Logical().Read(os.Getenv("VAULT_SECRET_PATH_DB"))
-	if err != nil {
-		return err
-	}
-
-	logger.Println("Querying users using credentials from proxy")
-	err = readUsersFromDatabase(ctx, logger, proxySecret)
-	if err != nil {
-		logger.Println("Failed to read users from database", err)
-	}
-
 	return nil
 }
 

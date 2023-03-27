@@ -20,6 +20,7 @@ resource "aws_lambda_function" "function" {
       VAULT_SECRET_FILE_DB = "/tmp/vault_secret.json",
       VAULT_SECRET_PATH    = "secret/myapp/config",
       VAULT_ASSUMED_ROLE_ARN = var.assume_role ? aws_iam_role.extra_role[0].arn : "",
+      VAULT_RUN_MODE       = "default",
       DATABASE_URL         = aws_db_instance.main.address
     }
   }

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -24,6 +23,7 @@ import (
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/extension"
 	"github.com/hashicorp/vault-lambda-extension/internal/proxy"
+	"github.com/hashicorp/vault-lambda-extension/internal/runmode"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/api"
 )
@@ -33,19 +33,36 @@ func main() {
 		Level: hclog.LevelFromString(os.Getenv(config.VaultLogLevel)),
 	})
 
-	err := realMain(logger.Named(config.VaultLogLevel))
-	if err != nil {
+	runMode := runmode.ModeDefault
+	if runModeEnv := os.Getenv(config.VaultRunMode); runModeEnv != "" {
+		runMode = runmode.ParseMode(runModeEnv)
+	}
+
+	h := newHandler(logger.Named(config.ExtensionName), runMode)
+	if err := h.handle(); err != nil {
 		logger.Error("Fatal error, exiting", "error", err)
 		os.Exit(1)
 	}
 }
 
-func realMain(logger hclog.Logger) error {
+func newHandler(logger hclog.Logger, runMode runmode.Mode) *handler {
+	return &handler{
+		logger:  logger,
+		runMode: runMode,
+	}
+}
+
+type handler struct {
+	logger  hclog.Logger
+	runMode runmode.Mode
+}
+
+func (s *handler) handle() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var wg sync.WaitGroup
-	srv, err := runExtension(ctx, logger, &wg)
+	cleanup, err := s.runExtension(ctx, &wg)
 	if err != nil {
 		return err
 	}
@@ -57,16 +74,16 @@ func realMain(logger hclog.Logger) error {
 		interruptChannel := make(chan os.Signal, 1)
 		signal.Notify(interruptChannel, syscall.SIGTERM, syscall.SIGINT)
 		select {
-		case s := <-interruptChannel:
-			logger.Info("Received signal, exiting", "signal", s)
+		case sig := <-interruptChannel:
+			s.logger.Info("Received signal, exiting", "signal", sig)
 		case <-shutdownChannel:
-			logger.Info("Received shutdown event, exiting")
+			s.logger.Info("Received shutdown event, exiting")
 		}
 
 		cancel()
-		if err := srv.Shutdown(context.Background()); err != nil {
+		if err := cleanup(context.Background()); err != nil {
 			// Error from closing listeners, or context timeout:
-			logger.Error("HTTP server shutdown error", "error", err)
+			s.logger.Error("HTTP server shutdown error", "error", err)
 		}
 	}()
 
@@ -76,20 +93,23 @@ func realMain(logger hclog.Logger) error {
 		return err
 	}
 
-	processEvents(ctx, logger, extensionClient)
+	processEvents(ctx, s.logger, extensionClient)
 
 	// Once processEvents returns, signal that it's time to shutdown.
 	shutdownChannel <- struct{}{}
 
 	// Ensure we wait for the HTTP server to gracefully shut down.
 	wg.Wait()
-	logger.Info("Graceful shutdown complete")
+	s.logger.Info("Graceful shutdown complete")
 
 	return nil
 }
 
-func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) (*http.Server, error) {
-	logger.Info("Initialising")
+func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(context.Context) error, error) {
+	s.logger.Info("Initialising")
+	defer func() {
+		s.logger.Info("Initialised")
+	}()
 
 	authConfig := config.AuthConfigFromEnv()
 	vaultConfig := api.DefaultConfig()
@@ -114,7 +134,7 @@ func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) 
 	} else {
 		ses = session.Must(session.NewSession())
 	}
-	client, err := vault.NewClient(config.ExtensionName, config.ExtensionVersion, logger.Named("vault-client"), vaultConfig, authConfig, ses)
+	client, err := vault.NewClient(config.ExtensionName, config.ExtensionVersion, s.logger.Named("vault-client"), vaultConfig, authConfig, ses)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
@@ -135,34 +155,40 @@ func runExtension(ctx context.Context, logger hclog.Logger, wg *sync.WaitGroup) 
 
 	client.VaultClient = client.VaultClient.WithRequestCallbacks(api.RequireState(newState), vault.UserAgentRequestCallback(uaFunc)).WithResponseCallbacks()
 
-	err = writePreconfiguredSecrets(client.VaultClient)
-	if err != nil {
-		return nil, err
+	if s.runMode.HasFileMode() {
+		if err := writePreconfiguredSecrets(client.VaultClient); err != nil {
+			return nil, err
+		}
 	}
 
 	// clear out eventual consistency helpers
 	client.VaultClient = client.VaultClient.WithRequestCallbacks().WithResponseCallbacks()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:8200")
-	if err != nil {
-		return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
-	}
-	srv := proxy.New(logger.Named("proxy"), client, config.CacheConfigFromEnv())
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		logger.Info("Starting HTTP proxy server")
-		err = srv.Serve(ln)
-		if err != http.ErrServerClosed {
-			logger.Error("HTTP server shutdown unexpectedly", "error", err)
+	cleanupFunc := func(context.Context) error { return nil }
+	if s.runMode.HasModeProxy() {
+		ln, err := net.Listen("tcp", "127.0.0.1:8200")
+		if err != nil {
+			return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
 		}
-	}()
+		srv := proxy.New(s.logger.Named("proxy"), client, config.CacheConfigFromEnv())
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.logger.Info("Starting HTTP proxy server")
+			err = srv.Serve(ln)
+			if err != http.ErrServerClosed {
+				s.logger.Error("HTTP server shutdown unexpectedly", "error", err)
+			}
+		}()
+		cleanupFunc = func(ctx context.Context) error {
+			return srv.Shutdown(ctx)
+		}
+	}
 
-	logger.Info("Initialised")
-
-	return srv, nil
+	return cleanupFunc, nil
 }
 
+// writePreconfiguredSecrets writes secrets to disk.
 func writePreconfiguredSecrets(client *api.Client) error {
 	configuredSecrets, err := config.ParseConfiguredSecrets()
 	if err != nil {
@@ -178,18 +204,18 @@ func writePreconfiguredSecrets(client *api.Client) error {
 
 		content, err := json.MarshalIndent(secret, "", "  ")
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to marshal json: %w", err)
 		}
+
 		dir := path.Dir(s.FilePath)
 		if _, err = os.Stat(dir); os.IsNotExist(err) {
-			err = os.MkdirAll(dir, 0755)
-			if err != nil {
+			if err := os.MkdirAll(dir, 0755); err != nil {
 				return fmt.Errorf("failed to create directory %q for secret %s: %s", dir, s.Name(), err)
 			}
 		}
-		err = ioutil.WriteFile(s.FilePath, content, 0644)
-		if err != nil {
-			return err
+
+		if err := os.WriteFile(s.FilePath, content, 0644); err != nil {
+			return fmt.Errorf("error writing file: %w", err)
 		}
 	}
 

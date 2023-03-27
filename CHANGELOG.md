@@ -2,6 +2,8 @@
 
 IMPROVEMENTS:
 * Requests from the extension to Vault now set the User-Agent field accordingly.
+* Introduced a `VAULT_RUN_MODE` environment variable to allow user to run in proxy mode, file mode, or both. 
+  * The default value is 'default', which runs in *both* proxy and file mode.
 
 ## 0.9.0 (February 23, 2023)
 

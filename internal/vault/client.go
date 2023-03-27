@@ -8,7 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -105,7 +105,6 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 
 // login authenticates to Vault using IAM auth, and sets the client's token.
 func (c *Client) login(ctx context.Context) error {
-
 	authConfig := config.AuthConfigFromEnv()
 	roleToAssumeArn := authConfig.AssumedRoleArn
 
@@ -114,16 +113,13 @@ func (c *Client) login(ctx context.Context) error {
 	/* If passing in a role (through VAULT_ASSUMED_ROLE_ARN enviornment variable)
 	to be assumed for Vault authentication, use it instead of the function execution role */
 	if roleToAssumeArn != "" {
-
 		c.logger.Debug(fmt.Sprintf("Trying to assume role with arn of %s to authenticate with Vault", roleToAssumeArn))
-
 		sessionName := "vault_auth"
 
 		result, err := c.stsSvc.AssumeRole(&sts.AssumeRoleInput{
 			RoleArn:         &roleToAssumeArn,
 			RoleSessionName: &sessionName,
 		})
-
 		if err != nil {
 			return fmt.Errorf("failed to assume role with arn of %s %w", roleToAssumeArn, err)
 		}
@@ -163,7 +159,7 @@ func (c *Client) login(ctx context.Context) error {
 		return err
 	}
 
-	body, err := ioutil.ReadAll(req.HTTPRequest.Body)
+	body, err := io.ReadAll(req.HTTPRequest.Body)
 	if err != nil {
 		return err
 	}
