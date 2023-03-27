@@ -77,7 +77,7 @@ func TestProxy(t *testing.T) {
 
 		// the stored request should be the one _from the proxy_ since it's stored by
 		// the (fake) vault.
-		require.NotEmpty(t, vaultRequests[0].Header.Get("User-Agent"))
+		require.Contains(t, vaultRequests[1].Header.Get("User-Agent"), proxyUserAgent)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		defer resp.Body.Close()
@@ -97,7 +97,7 @@ func TestProxy(t *testing.T) {
 		require.NoError(t, err)
 		resp, err := proxyVaultClient.Logical().Read("secret/data/foo")
 
-		require.NotEmpty(t, vaultRequests[0].Header.Get("User-Agent"))
+		require.Contains(t, vaultRequests[0].Header.Get("User-Agent"), proxyUserAgent)
 		require.NoError(t, err)
 		require.Equal(t, "bar", resp.Data["foo"])
 	})
