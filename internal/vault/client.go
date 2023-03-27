@@ -32,6 +32,9 @@ const (
 
 // Client holds api.Client and handles state required to renew tokens and re-auth as required.
 type Client struct {
+	Name    string
+	Version string
+
 	mtx sync.Mutex
 
 	VaultClient *api.Client
@@ -50,7 +53,7 @@ type Client struct {
 
 // NewClient uses the AWS IAM auth method configured in a Vault cluster to
 // authenticate the execution role and create a Vault API client.
-func NewClient(logger hclog.Logger, vaultConfig *api.Config, authConfig config.AuthConfig, awsSes *session.Session) (*Client, error) {
+func NewClient(name, version string, logger hclog.Logger, vaultConfig *api.Config, authConfig config.AuthConfig, awsSes *session.Session) (*Client, error) {
 	vaultClient, err := api.NewClient(vaultConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error making extension: %w", err)
@@ -64,6 +67,8 @@ func NewClient(logger hclog.Logger, vaultConfig *api.Config, authConfig config.A
 	client := &Client{
 		VaultClient: vaultClient,
 		VaultConfig: vaultConfig,
+		Name:        name,
+		Version:     version,
 
 		logger:     logger,
 		stsSvc:     sts.New(awsSes),

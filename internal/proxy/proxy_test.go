@@ -124,7 +124,7 @@ func startProxy(t *testing.T, vaultAddress string, ses *session.Session) (string
 	vaultConfig := api.DefaultConfig()
 	require.NoError(t, vaultConfig.Error)
 	vaultConfig.Address = vaultAddress
-	client, err := vault.NewClient(hclog.NewNullLogger(), vaultConfig, config.AuthConfig{}, ses)
+	client, err := vault.NewClient("", "", hclog.NewNullLogger(), vaultConfig, config.AuthConfig{}, ses)
 	require.NoError(t, err)
 	client.VaultConfig.Address = vaultAddress
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
