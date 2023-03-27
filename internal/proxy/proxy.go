@@ -83,6 +83,10 @@ func proxyHandler(logger hclog.Logger, client *vault.Client, cache *Cache) func(
 			}
 		}
 
+		// add user agent header
+		ua := config.GetUserAgentBase(client.Name, client.Version)
+		fwReq.Header.Set("User-Agent", ua+"; requesting from proxy")
+
 		resp, err := client.VaultConfig.HttpClient.Do(fwReq)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to proxy request: %s", err), http.StatusBadGateway)
