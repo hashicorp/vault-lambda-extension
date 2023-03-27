@@ -29,7 +29,7 @@ func ParseMode(rm string) Mode {
 	return Mode(rm)
 }
 
-func (m Mode) HasModeProxy() bool {
+func (m Mode) HasModeFile() bool {
 	return m == ModeDefault || m == ModeProxy
 }
 

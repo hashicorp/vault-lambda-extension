@@ -165,7 +165,7 @@ func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 	client.VaultClient = client.VaultClient.WithRequestCallbacks().WithResponseCallbacks()
 
 	cleanupFunc := func(context.Context) error { return nil }
-	if s.runMode.HasModeProxy() {
+	if s.runMode.HasModeFile() {
 		ln, err := net.Listen("tcp", "127.0.0.1:8200")
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
