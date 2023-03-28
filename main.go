@@ -107,9 +107,6 @@ func (s *handler) handle() error {
 
 func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(context.Context) error, error) {
 	s.logger.Info("Initialising")
-	defer func() {
-		s.logger.Info("Initialised")
-	}()
 
 	authConfig := config.AuthConfigFromEnv()
 	vaultConfig := api.DefaultConfig()
@@ -155,7 +152,7 @@ func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 
 	client.VaultClient = client.VaultClient.WithRequestCallbacks(api.RequireState(newState), vault.UserAgentRequestCallback(uaFunc)).WithResponseCallbacks()
 
-	if s.runMode.HasFileMode() {
+	if s.runMode.HasModeFile() {
 		if err := writePreconfiguredSecrets(client.VaultClient); err != nil {
 			return nil, err
 		}
@@ -165,7 +162,7 @@ func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 	client.VaultClient = client.VaultClient.WithRequestCallbacks().WithResponseCallbacks()
 
 	cleanupFunc := func(context.Context) error { return nil }
-	if s.runMode.HasModeFile() {
+	if s.runMode.HasModeProxy() {
 		ln, err := net.Listen("tcp", "127.0.0.1:8200")
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
@@ -185,6 +182,7 @@ func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 		}
 	}
 
+	s.logger.Info("Initialised")
 	return cleanupFunc, nil
 }
 
