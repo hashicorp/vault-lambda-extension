@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -74,7 +75,7 @@ func NewCache(cc config.CacheConfig) *Cache {
 // constructs the CacheKey for this request and token and returns the SHA256
 // hash
 func makeRequestHash(logger hclog.Logger, r *http.Request, token string) (string, error) {
-	reqBody, err := ioutil.ReadAll(r.Body)
+	reqBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		if r.Body != nil {
 			if err := r.Body.Close(); err != nil {
