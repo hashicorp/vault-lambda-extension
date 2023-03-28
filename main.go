@@ -57,12 +57,12 @@ type handler struct {
 	runMode runmode.Mode
 }
 
-func (s *handler) handle() error {
+func (h *handler) handle() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var wg sync.WaitGroup
-	cleanup, err := s.runExtension(ctx, &wg)
+	cleanup, err := h.runExtension(ctx, &wg)
 	if err != nil {
 		return err
 	}
@@ -75,15 +75,15 @@ func (s *handler) handle() error {
 		signal.Notify(interruptChannel, syscall.SIGTERM, syscall.SIGINT)
 		select {
 		case sig := <-interruptChannel:
-			s.logger.Info("Received signal, exiting", "signal", sig)
+			h.logger.Info("Received signal, exiting", "signal", sig)
 		case <-shutdownChannel:
-			s.logger.Info("Received shutdown event, exiting")
+			h.logger.Info("Received shutdown event, exiting")
 		}
 
 		cancel()
 		if err := cleanup(context.Background()); err != nil {
 			// Error from closing listeners, or context timeout:
-			s.logger.Error("HTTP server shutdown error", "error", err)
+			h.logger.Error("HTTP server shutdown error", "error", err)
 		}
 	}()
 
@@ -93,20 +93,20 @@ func (s *handler) handle() error {
 		return err
 	}
 
-	processEvents(ctx, s.logger, extensionClient)
+	processEvents(ctx, h.logger, extensionClient)
 
 	// Once processEvents returns, signal that it's time to shutdown.
 	shutdownChannel <- struct{}{}
 
 	// Ensure we wait for the HTTP server to gracefully shut down.
 	wg.Wait()
-	s.logger.Info("Graceful shutdown complete")
+	h.logger.Info("Graceful shutdown complete")
 
 	return nil
 }
 
-func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(context.Context) error, error) {
-	s.logger.Info("Initialising")
+func (h *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(context.Context) error, error) {
+	h.logger.Info("Initialising")
 
 	authConfig := config.AuthConfigFromEnv()
 	vaultConfig := api.DefaultConfig()
@@ -131,7 +131,7 @@ func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 	} else {
 		ses = session.Must(session.NewSession())
 	}
-	client, err := vault.NewClient(config.ExtensionName, config.ExtensionVersion, s.logger.Named("vault-client"), vaultConfig, authConfig, ses)
+	client, err := vault.NewClient(config.ExtensionName, config.ExtensionVersion, h.logger.Named("vault-client"), vaultConfig, authConfig, ses)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
@@ -152,7 +152,7 @@ func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 
 	client.VaultClient = client.VaultClient.WithRequestCallbacks(api.RequireState(newState), vault.UserAgentRequestCallback(uaFunc)).WithResponseCallbacks()
 
-	if s.runMode.HasModeFile() {
+	if h.runMode.HasModeFile() {
 		if err := writePreconfiguredSecrets(client.VaultClient); err != nil {
 			return nil, err
 		}
@@ -162,19 +162,19 @@ func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 	client.VaultClient = client.VaultClient.WithRequestCallbacks().WithResponseCallbacks()
 
 	cleanupFunc := func(context.Context) error { return nil }
-	if s.runMode.HasModeProxy() {
+	if h.runMode.HasModeProxy() {
 		ln, err := net.Listen("tcp", "127.0.0.1:8200")
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
 		}
-		srv := proxy.New(s.logger.Named("proxy"), client, config.CacheConfigFromEnv())
+		srv := proxy.New(h.logger.Named("proxy"), client, config.CacheConfigFromEnv())
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			s.logger.Info("Starting HTTP proxy server")
+			h.logger.Info("Starting HTTP proxy server")
 			err = srv.Serve(ln)
 			if err != http.ErrServerClosed {
-				s.logger.Error("HTTP server shutdown unexpectedly", "error", err)
+				h.logger.Error("HTTP server shutdown unexpectedly", "error", err)
 			}
 		}()
 		cleanupFunc = func(ctx context.Context) error {
@@ -182,7 +182,7 @@ func (s *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 		}
 	}
 
-	s.logger.Info("Initialised")
+	h.logger.Info("Initialised")
 	return cleanupFunc, nil
 }
 
