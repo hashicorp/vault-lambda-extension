@@ -85,7 +85,7 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          VERSION: ${{ steps.get-product-version.outputs.product-version }}
+          VERSION: ${{ needs.get-product-version.outputs.product-version }}
         run: |
           make build
           pushd pkg
