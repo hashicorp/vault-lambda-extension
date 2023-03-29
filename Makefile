@@ -2,12 +2,12 @@ GOOS?=linux
 GOARCH?=amd64
 CI_TEST_ARGS=
 TERRAFORM_ARGS=
-
+VERSION?=0.0.0-dev
 .PHONY: build zip lint test clean mod quick-start quick-start-destroy publish-layer-version
 
 build: clean
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build \
-		-ldflags '-s -w' \
+		-ldflags "-s -w -X 'internal/config.ExtensionVersion=$(VERSION)'" \
 		-a -o pkg/extensions/vault-lambda-extension \
 		.
 

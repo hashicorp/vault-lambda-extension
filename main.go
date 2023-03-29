@@ -33,6 +33,7 @@ func main() {
 		Level: hclog.LevelFromString(os.Getenv(config.VaultLogLevel)),
 	})
 
+	logger.Info("Starting Vault Lambda Extension", config.ExtensionVersion)
 	runMode := runmode.ModeDefault
 	if runModeEnv := os.Getenv(config.VaultRunMode); runModeEnv != "" {
 		runMode = runmode.ParseMode(runModeEnv)
