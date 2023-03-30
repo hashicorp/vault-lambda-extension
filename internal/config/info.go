@@ -1,8 +1,12 @@
 package config
 
 const (
-	ExtensionName    = "vault-lambda-extension"
-	ExtensionVersion = "0.9.0"
-	VaultLogLevel    = "VAULT_LOG_LEVEL" // Optional, one of TRACE, DEBUG, INFO, WARN, ERROR, OFF
-	VaultRunMode     = "VAULT_RUN_MODE"
+	ExtensionName = "vault-lambda-extension"
+	VaultLogLevel = "VAULT_LOG_LEVEL" // Optional, one of TRACE, DEBUG, INFO, WARN, ERROR, OFF
+	VaultRunMode  = "VAULT_RUN_MODE"
+)
+
+var (
+	// ExtensionVersion should be a var type, so the go build tool can override and inject a custom version.
+	ExtensionVersion = "0.0.0-dev"
 )
