@@ -1,9 +1,12 @@
 ## Unreleased
 
+## 0.10.0 (March 30, 2023)
+
 IMPROVEMENTS:
 * Requests from the extension to Vault now set the User-Agent field accordingly.
 * Introduced a `VAULT_RUN_MODE` environment variable to allow user to run in proxy mode, file mode, or both. 
   * The default value is 'default', which runs in *both* proxy and file mode.
+* Vault Lambda Extension version dynamically injected at build time.
 
 ## 0.9.0 (February 23, 2023)
 
