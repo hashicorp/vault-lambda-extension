@@ -10,7 +10,7 @@ jobs:
     outputs:
       go-version: ${{ steps.get-go-version.outputs.go-version }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Determine Go version
         id: get-go-version
         run: |
@@ -23,12 +23,12 @@ jobs:
       - get-go-version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
         with:
           go-version: ${{ needs.get-go-version.outputs.go-version }}
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@08e2f20817b15149a52b5b3ebe7de50aff2ba8c5 # v3.4.0
         with:
           args: |
             -v --concurrency 2 \
@@ -38,47 +38,6 @@ jobs:
             --enable gosimple \
             --enable govet
 
-  gomod:
-    needs:
-        - get-go-version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/setup-go@v2
-        with:
-          go-version: ${{ needs.get-go-version.outputs.go-version }}
-      - uses: actions/checkout@v2
-      - name: go mod tidy
-        run: |
-          make mod
-          if ! git diff --exit-code; then
-            echo "Git directory has go.mod or go.sum changes"
-            exit 1
-          fi
-
-  test:
-    needs:
-      - get-go-version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      # cache/restore go mod
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - uses: actions/setup-go@v2
-        with:
-          go-version: ${{ needs.get-go-version.outputs.go-version }}
-
-      - name: Install gotestsum
-        run: go install gotest.tools/gotestsum@v1.7.0
-
-      - name: Test
-        run: |
-          make test
+  run-tests:
+    # using `main` as the ref will keep your workflow up-to-date
+    uses: hashicorp/vault-workflows-common/.github/workflows/tests.yaml@main
