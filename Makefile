@@ -1,6 +1,5 @@
 GOOS?=linux
 GOARCH?=amd64
-CI_TEST_ARGS=
 TERRAFORM_ARGS=
 PKG=github.com/hashicorp/vault-lambda-extension/internal/config
 VERSION?=0.0.0-dev
@@ -27,7 +26,7 @@ lint:
 		--enable govet
 
 test:
-	gotestsum --format=short-verbose $(CI_TEST_ARGS)
+	CGO_ENABLED=0 go test -v ./... -timeout=20m
 
 clean:
 	-rm -rf pkg
