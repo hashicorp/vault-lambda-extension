@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 // Package runmode determines if the vault lambda extension should run in default mode, file mode, or proxy mode.
 // default mode: uses both file and proxy mode
 // file mode: writes secrets to disk
