@@ -13,19 +13,6 @@ env:
   PKG_NAME: "vault-lambda-extension"
 
 jobs:
-  get-go-version:
-    name: "Determine Go toolchain version"
-    runs-on: ubuntu-latest
-    outputs:
-      go-version: ${{ steps.get-go-version.outputs.go-version }}
-    steps:
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
-      - name: Determine Go version
-        id: get-go-version
-        run: |
-          echo "Building with Go $(cat .go-version)"
-          echo "::set-output name=go-version::$(cat .go-version)"
-
   get-product-version:
     runs-on: ubuntu-latest
     outputs:
@@ -61,7 +48,6 @@ jobs:
 
   build:
     needs:
-      - get-go-version
       - get-product-version
     runs-on: ubuntu-latest
     strategy:
@@ -71,7 +57,7 @@ jobs:
 
       fail-fast: true
 
-    name: Go ${{ needs.get-go-version.outputs.go-version }} ${{ matrix.goos }} ${{ matrix.goarch }} build
+    name: Go ${{ matrix.goos }} ${{ matrix.goarch }} build
 
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
@@ -79,7 +65,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
         with:
-          go-version: ${{ needs.get-go-version.outputs.go-version }}
+          go-version-file: .go-version
 
       - name: Build
         env:
