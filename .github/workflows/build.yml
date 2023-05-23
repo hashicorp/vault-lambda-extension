@@ -24,8 +24,7 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version || '0.0.0-dev' }}"
           echo "Using version ${VERSION}"
-          echo "::set-output name=product-version::${VERSION}"
-          run: echo "product-version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "product-version=${VERSION}" >> "$GITHUB_OUTPUT"
 
   generate-metadata-file:
     needs: get-product-version
