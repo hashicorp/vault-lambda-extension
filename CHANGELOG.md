@@ -1,5 +1,8 @@
 ## Unreleased
 
+IMPROVEMENTS:
+* quick-start: Update Postgres version to 14.7
+
 ## 0.10.0 (March 30, 2023)
 
 IMPROVEMENTS:
