@@ -23,7 +23,7 @@ variable "instance_type" {
 
 # DB instance size
 variable "db_instance_type" {
-  default = "db.t2.micro"
+  default = "db.t3.micro"
 }
 
 # true if you want to set and use VAULT_ASSUME_ROLE_ARN
