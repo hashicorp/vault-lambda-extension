@@ -1,7 +1,10 @@
 ## Unreleased
 
+## 0.10.1 (July 10, 2023)
+
 IMPROVEMENTS:
 * quick-start: Update Postgres version to 14.7
+* Add debug logs during initialization step
 
 ## 0.10.0 (March 30, 2023)
 
