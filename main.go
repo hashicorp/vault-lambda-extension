@@ -15,17 +15,19 @@ import (
 	"path"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/vault/api"
+
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/extension"
 	"github.com/hashicorp/vault-lambda-extension/internal/proxy"
 	"github.com/hashicorp/vault-lambda-extension/internal/runmode"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
-	"github.com/hashicorp/vault/api"
 )
 
 func main() {
@@ -107,6 +109,7 @@ func (h *handler) handle() error {
 }
 
 func (h *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(context.Context) error, error) {
+	start := time.Now()
 	h.logger.Info("Initialising")
 
 	authConfig := config.AuthConfigFromEnv()
@@ -154,7 +157,7 @@ func (h *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 	client.VaultClient = client.VaultClient.WithRequestCallbacks(api.RequireState(newState), vault.UserAgentRequestCallback(uaFunc)).WithResponseCallbacks()
 
 	if h.runMode.HasModeFile() {
-		if err := writePreconfiguredSecrets(client.VaultClient); err != nil {
+		if err := writePreconfiguredSecrets(h.logger, client.VaultClient); err != nil {
 			return nil, err
 		}
 	}
@@ -164,6 +167,8 @@ func (h *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 
 	cleanupFunc := func(context.Context) error { return nil }
 	if h.runMode.HasModeProxy() {
+		start := time.Now()
+		h.logger.Debug("initialising proxy mode")
 		ln, err := net.Listen("tcp", "127.0.0.1:8200")
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on port 8200: %w", err)
@@ -181,14 +186,17 @@ func (h *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 		cleanupFunc = func(ctx context.Context) error {
 			return srv.Shutdown(ctx)
 		}
+		h.logger.Debug(fmt.Sprintf("proxy mode initialised in %v", time.Since(start)))
 	}
 
-	h.logger.Info("Initialised")
+	h.logger.Info(fmt.Sprintf("Initialised in %v", time.Since(start)))
 	return cleanupFunc, nil
 }
 
 // writePreconfiguredSecrets writes secrets to disk.
-func writePreconfiguredSecrets(client *api.Client) error {
+func writePreconfiguredSecrets(logger hclog.Logger, client *api.Client) error {
+	start := time.Now()
+	logger.Debug("writing secrets to disk")
 	configuredSecrets, err := config.ParseConfiguredSecrets()
 	if err != nil {
 		return fmt.Errorf("failed to parse configured secrets to read: %w", err)
@@ -218,6 +226,7 @@ func writePreconfiguredSecrets(client *api.Client) error {
 		}
 	}
 
+	logger.Debug(fmt.Sprintf("wrote secrets to disk in %v", time.Since(start)))
 	return nil
 }
 
