@@ -21,8 +21,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault/api"
+
+	"github.com/hashicorp/vault-lambda-extension/internal/config"
 )
 
 const (
@@ -82,6 +83,8 @@ func NewClient(name, version string, logger hclog.Logger, vaultConfig *api.Confi
 
 // Token synchronously renews/re-auths as required and returns a Vault token.
 func (c *Client) Token(ctx context.Context) (string, error) {
+	start := time.Now()
+	c.logger.Debug("fetching token")
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -100,6 +103,7 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 		}
 	}
 
+	c.logger.Debug(fmt.Sprintf("fetched token in %v", time.Since(start)))
 	return c.VaultClient.Token(), nil
 }
 
