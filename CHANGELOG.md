@@ -1,5 +1,19 @@
 ## Unreleased
 
+## 0.10.2 (February 6, 2024)
+
+IMPROVEMENTS:
+* Bumped versions for the following dependencies with security vulnerabilities:
+  * golang.org/x/crypto v0.18.0
+  * golang.org/x/net v0.20.0
+  * golang.org/x/sys v0.16.0
+  * golang.org/x/text v0.14.0
+* Bumped dependencies:
+  * github.com/aws/aws-sdk-go v1.50.12
+  * github.com/stretchr/testify v1.8.4
+  * github.com/hashicorp/vault/api v1.11.0
+  * github.com/hashicorp/vault/sdk v0.10.2
+  
 ## 0.10.1 (July 10, 2023)
 
 IMPROVEMENTS:
