@@ -2,6 +2,12 @@
 
 ## 0.10.2 (February 6, 2024)
 
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:18
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:6
+```
+
 IMPROVEMENTS:
 * Bumped versions for the following dependencies with security vulnerabilities:
   * golang.org/x/crypto v0.18.0
@@ -16,11 +22,23 @@ IMPROVEMENTS:
   
 ## 0.10.1 (July 10, 2023)
 
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:17
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:5
+```
+
 IMPROVEMENTS:
 * quick-start: Update Postgres version to 14.7
 * Add debug logs during initialization step
 
 ## 0.10.0 (March 30, 2023)
+
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:16
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:4
+```
 
 IMPROVEMENTS:
 * Requests from the extension to Vault now set the User-Agent field accordingly.
