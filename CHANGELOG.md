@@ -3,8 +3,13 @@
 ## 0.10.3 (April 30, 2024)
 
 IMPROVEMENTS:
-* bump golang.org/x/net (https://github.com/hashicorp/vault-lambda-extension/pull/135)
-* bump go version, vault api, and vault sdk (https://github.com/hashicorp/vault-lambda-extension/pull/134)
+* Bump dependencies (https://github.com/hashicorp/vault-lambda-extension/pull/135):
+  * golang.org/x/crypto to v0.22.0
+  * golang.org/x/net to v0.24.0
+  * golang.org/x/sys to v0.19.0
+* Bump dependencies (https://github.com/hashicorp/vault-lambda-extension/pull/134):
+  * go to 1.22
+  * vault api to v1.12.2
 
 ## 0.10.2 (February 6, 2024)
 
