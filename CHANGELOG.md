@@ -1,8 +1,13 @@
 ## Unreleased
 
-## 0.10.3 (April 30, 2024)
+## 0.10.3 (May 1, 2024)
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:19
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:7
+```
 
-IMPROVEMENTS:
+Dependency Updates:
 * Bump dependencies (https://github.com/hashicorp/vault-lambda-extension/pull/135):
   * golang.org/x/crypto to v0.22.0
   * golang.org/x/net to v0.24.0
