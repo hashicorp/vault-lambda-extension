@@ -18,20 +18,38 @@ Lambda function, depending on your desired architecture.
 amd64 (x86_64):
 
 ```text
-arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:18
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:19
 ```
 
 arm64:
 
 ```text
-arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension-arm64:6
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension-arm64:7
 ```
 
-Where region may be any of `af-south-1`, `ap-east-1`, `ap-northeast-1`,
-`ap-northeast-2`, `ap-northeast-3`, `ap-south-1`, `ap-south-2`, `ap-southeast-1`,
-`ap-southeast-2`, `ca-central-1`, `eu-central-1`, `eu-north-1`, `eu-south-1`,
-`eu-west-1`, `eu-west-2`, `eu-west-3`, `me-south-1`, `sa-east-1`, `us-east-1`,
-`us-east-2`, `us-west-1`, `us-west-2`.
+Where region may be any of
+  * `af-south-1`
+  * `ap-east-1`
+  * `ap-northeast-1`
+  * `ap-northeast-2`
+  * `ap-northeast-3`
+  * `ap-south-1`
+  * `ap-south-2`
+  * `ap-southeast-1`
+  * `ap-southeast-2`
+  * `ca-central-1`
+  * `eu-central-1`
+  * `eu-north-1`
+  * `eu-south-1`
+  * `eu-west-1`
+  * `eu-west-2`
+  * `eu-west-3`
+  * `me-south-1`
+  * `sa-east-1`
+  * `us-east-1`
+  * `us-east-2`
+  * `us-west-1`
+  * `us-west-2`
 
 Alternatively, you can download binaries for packaging into a container image
 [here][releases]. See the full [documentation page][vault-docs] for more details.
