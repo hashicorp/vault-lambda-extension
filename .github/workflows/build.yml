@@ -68,6 +68,7 @@ jobs:
           go-version-file: .go-version
 
       - name: Build
+        id: build-binary
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -76,10 +77,12 @@ jobs:
           make build
           pushd pkg
           mkdir out
-          zip -r out/${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip extensions
+          ZIP_FILE="out/${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip"
+          zip -r "${ZIP_FILE}" ../LICENSE extensions
           popd
-
+          echo "path=${ZIP_FILE}" >> $GITHUB_OUTPUT
+          echo "name=$(basename ${ZIP_FILE})" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
-          name: ${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
-          path: pkg/out/${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          name: ${{ steps.build-binary.outputs.name }}
+          path: ${{ steps.build-binary.outputs.path }}
