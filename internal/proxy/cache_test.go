@@ -61,6 +61,22 @@ func TestCache_computeRequestID(t *testing.T) {
 			false,
 		},
 		{
+			"ignore distributed tracing headers",
+			&CacheKey{
+				Request: &http.Request{
+					URL: &url.URL{
+						Path: "test",
+					},
+					Header: http.Header{
+						"Traceparent": []string{"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
+						"Tracestate":  []string{"rojo=00f067aa0ba902b7,congo=t61rcWkgMzE"},
+					},
+				},
+			},
+			"7b5db388f211fd9edca8c6c254831fb01ad4e6fe624dbb62711f256b5e803717",
+			false,
+		},
+		{
 			"nil CacheKey",
 			nil,
 			"",
