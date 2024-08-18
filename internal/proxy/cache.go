@@ -118,6 +118,10 @@ func computeRequestID(key *CacheKey) (string, error) {
 	cloned.Header.Del(api.HeaderForward)
 	cloned.Header.Del(api.HeaderInconsistent)
 	cloned.Header.Del(VaultCacheControlHeaderName)
+	// remove standard distributed tracing headers (https://www.w3.org/TR/trace-context/),
+	// otherwise instrumented requests will always be unique
+	cloned.Header.Del("traceparent")
+	cloned.Header.Del("tracestate")
 	// Serialize the request
 	if err := cloned.Write(&b); err != nil {
 		return "", fmt.Errorf("failed to serialize request: %v", err)
