@@ -50,6 +50,7 @@ type Client struct {
 	tokenExpiry            time.Time
 	tokenTTL               time.Duration
 	tokenRenewable         bool
+	tokenRevoked           bool
 }
 
 // NewClient uses the AWS IAM auth method configured in a Vault cluster to
@@ -88,7 +89,7 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	if c.expired() {
+	if c.expired() || c.tokenRevoked {
 		c.logger.Debug("authenticating to Vault")
 		err := c.login(ctx)
 		if err != nil {
@@ -105,6 +106,11 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 
 	c.logger.Debug(fmt.Sprintf("fetched token in %v", time.Since(start)))
 	return c.VaultClient.Token(), nil
+}
+
+// Mark token revoked
+func (c *Client) RevokeToken() {
+	c.tokenRevoked = true
 }
 
 // login authenticates to Vault using IAM auth, and sets the client's token.
@@ -209,6 +215,7 @@ func (c *Client) updateTokenMetadata(secret *api.Secret) error {
 		return err
 	}
 
+	c.tokenRevoked = false
 	c.tokenExpiry = time.Now().Round(0).Add(c.tokenTTL)
 	c.tokenRenewable, err = secret.TokenIsRenewable()
 	if err != nil {
