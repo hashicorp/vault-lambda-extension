@@ -83,7 +83,7 @@ func NewClient(name, version string, logger hclog.Logger, vaultConfig *api.Confi
 
 // Token synchronously renews/re-auths as required and returns a Vault token.
 func (c *Client) Token(ctx context.Context) (string, error) {
-	start := time.Now()
+	start := time.Now().Round(0)
 	c.logger.Debug("fetching token")
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
@@ -209,7 +209,7 @@ func (c *Client) updateTokenMetadata(secret *api.Secret) error {
 		return err
 	}
 
-	c.tokenExpiry = time.Now().Add(c.tokenTTL)
+	c.tokenExpiry = time.Now().Round(0).Add(c.tokenTTL)
 	c.tokenRenewable, err = secret.TokenIsRenewable()
 	if err != nil {
 		return err
@@ -220,7 +220,7 @@ func (c *Client) updateTokenMetadata(secret *api.Secret) error {
 
 // Returns true if current time is after tokenExpiry, or within 10s.
 func (c *Client) expired() bool {
-	return time.Now().Add(c.tokenExpiryGracePeriod).After(c.tokenExpiry)
+	return time.Now().Round(0).Add(c.tokenExpiryGracePeriod).After(c.tokenExpiry)
 }
 
 // Returns true if tokenExpiry time is in less than 20% of tokenTTL.
