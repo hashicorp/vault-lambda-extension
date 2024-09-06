@@ -1,5 +1,26 @@
 ## Unreleased
 
+## 0.11.0 (Sept 6, 2024)
+
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:20
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:8
+```
+
+FEATURES:
+
+* Add optional header `X-Vault-Token-Options` to revoke token when set to `revoke` (#149)
+
+IMPROVEMENTS:
+
+* update go-retryablehttp (#144)
+* Exclude distributed tracing headers from cache key (#145)
+
+BUGS:
+
+* Strip Monotonic Clock to prevent Lambda suspension from miscalculating TTL. Fixes #113. (#150)
+
 ## 0.10.3 (May 1, 2024)
 LAYERS:
 ```
