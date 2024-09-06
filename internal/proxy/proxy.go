@@ -19,6 +19,8 @@ import (
 
 const (
 	VaultCacheControlHeaderName = "X-Vault-Cache-Control"
+	VaultTokenOptionsHeaderName = "X-Vault-Token-Options"
+	headerOptionRevokeToken     = "revoke"
 	proxyUserAgent              = "; requesting from proxy"
 )
 
@@ -38,6 +40,10 @@ func New(logger hclog.Logger, client *vault.Client, cacheConfig config.CacheConf
 // https://github.com/hashicorp/vault/blob/22b486b651b8956d32fb24e77cef4050df7094b6/command/agent/cache/api_proxy.go
 func proxyHandler(logger hclog.Logger, client *vault.Client, cache *Cache) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if shouldRevokeToken(r.Header) {
+			client.RevokeToken()
+		}
+
 		token, err := client.Token(r.Context())
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to get valid Vault token: %s", err), http.StatusInternalServerError)
@@ -153,4 +159,8 @@ func copyHeaders(dst, src http.Header) {
 			dst.Add(k, v)
 		}
 	}
+}
+
+func shouldRevokeToken(headers http.Header) bool {
+	return headers.Get(VaultTokenOptionsHeaderName) == headerOptionRevokeToken
 }

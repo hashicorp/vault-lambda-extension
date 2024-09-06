@@ -118,6 +118,32 @@ func TestProxy(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusBadGateway, resp.StatusCode)
 	})
+
+	t.Run("performs login when given token revoke header", func(t *testing.T) {
+		fakeVaultResponse = vaultResponseFooBar
+		// ensure the proxy has already logged in, ignore response, inspect next response
+		_, err := http.Get(fmt.Sprintf("http://%s/v1/secret/data/foo", proxyAddr))
+		require.NoError(t, err)
+		// reset request array to focus on next request
+		vaultRequests = []*http.Request{}
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/v1/secret/data/foo", proxyAddr), nil)
+		require.NoError(t, err)
+		req.Header.Add(VaultTokenOptionsHeaderName, headerOptionRevokeToken)
+		resp, err := http.DefaultClient.Do(req)
+
+		// the stored request should be the one _from the proxy_ since it's stored by
+		// the (fake) vault.
+		// revoke should trigger another login call, and still get the secret
+		require.Contains(t, vaultRequests[0].URL.Path, "login")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		var secret api.Secret
+		require.NoError(t, json.Unmarshal(body, &secret), string(body))
+		require.Equal(t, "bar", secret.Data["foo"])
+	})
 }
 
 func startProxy(t *testing.T, vaultAddress string, ses *session.Session) (string, func() error) {

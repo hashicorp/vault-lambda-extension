@@ -174,6 +174,32 @@ func TestTokenRenewal(t *testing.T) {
 		require.True(t, c.tokenExpiry.After(time.Now().Add(55*time.Minute)))
 	})
 
+	t.Run("TestToken_MakesLoginCallIfRevoked", func(t *testing.T) {
+		vaultRequests = []*http.Request{}
+		c := Client{
+			VaultClient: generateVaultClient(),
+			logger:      hclog.Default(),
+			stsSvc:      stsSvc,
+			authConfig: config.AuthConfig{
+				Provider: "aws",
+			},
+			tokenExpiry: time.Now().Add(time.Hour),
+		}
+		c.RevokeToken()
+
+		secretFunc = generateSecretFunc(t, []*api.Secret{
+			with1hLease,
+		})
+		token, err := c.Token(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, 1, len(vaultRequests))
+		require.Equal(t, "/v1/auth/aws/login", vaultRequests[0].URL.Path)
+		require.Equal(t, "foo-1h-token", token)
+		require.Equal(t, time.Hour, c.tokenTTL)
+		require.True(t, c.tokenRenewable)
+		require.True(t, c.tokenExpiry.After(time.Now().Add(55*time.Minute)))
+	})
+
 	t.Run("TestToken_MakesLoginCallIfExpired_PropagatesError", func(t *testing.T) {
 		vaultRequests = []*http.Request{}
 		c := Client{
