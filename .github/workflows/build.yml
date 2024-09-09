@@ -82,6 +82,14 @@ jobs:
           popd
           echo "path=${ZIP_FILE}" >> $GITHUB_OUTPUT
           echo "name=$(basename ${ZIP_FILE})" >> $GITHUB_OUTPUT
+
+          # debug
+          ls -lah
+          tree pkg
+
+          echo "::debug:: path=${ZIP_FILE}"
+          echo "::debug:: name=$(basename ${ZIP_FILE})"
+
       - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           name: ${{ steps.build-binary.outputs.name }}
