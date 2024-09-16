@@ -11,7 +11,7 @@ project "vault-lambda-extension" {
   github {
     organization = "hashicorp"
     repository = "vault-lambda-extension"
-    release_branches = ["main", "test-crt-prepare"]
+    release_branches = ["main"]
   }
 }
 
