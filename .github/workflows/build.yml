@@ -75,14 +75,12 @@ jobs:
           VERSION: ${{ needs.get-product-version.outputs.product-version }}
         run: |
           make build
+          pushd pkg
           mkdir out
-          ZIP_FILE="out/${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip"
-          zip -r "${ZIP_FILE}" LICENSE pkg/extensions
-
-          echo "path=${ZIP_FILE}" >> $GITHUB_OUTPUT
-          echo "name=$(basename ${ZIP_FILE})" >> $GITHUB_OUTPUT
+          zip -r out/${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip extensions
+          popd
 
       - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
-          name: ${{ steps.build-binary.outputs.name }}
-          path: ${{ steps.build-binary.outputs.path }}
+          name: ${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          path: pkg/out/${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
