@@ -10,7 +10,7 @@ resource "aws_db_instance" "main" {
   allocated_storage      = 20
   storage_type           = "gp2"
   engine                 = "postgres"
-  engine_version         = "14.7"
+  engine_version         = "14.12"
   instance_class         = var.db_instance_type
   db_name                = "lambdadb"
   username               = "vaultadmin"
