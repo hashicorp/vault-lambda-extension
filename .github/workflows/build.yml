@@ -54,8 +54,9 @@ jobs:
       matrix:
         goos: [linux]
         goarch: ["arm64", "amd64"]
-
       fail-fast: true
+    env:
+      ARTIFACT_NAME: ${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
 
     name: Go ${{ matrix.goos }} ${{ matrix.goarch }} build
 
@@ -71,8 +72,9 @@ jobs:
         id: build-binary
         run: |
           make zip
+          mv pkg/${{ env.PKG_NAME }}.zip $ARTIFACT_NAME
 
       - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
-          name: ${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
-          path: pkg/${{ env.PKG_NAME }}.zip
+          name: $ARTIFACT_NAME
+          path: $ARTIFACT_NAME
