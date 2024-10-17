@@ -69,14 +69,15 @@ jobs:
       - name: Build
         id: build-binary
         run: |
-          ARTIFACT_NAME="${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip"
+          ZIP_FILE="${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip"
 
           make zip
-          mv pkg/${{ env.PKG_NAME }}.zip "$ARTIFACT_NAME"
+          mv pkg/${{ env.PKG_NAME }}.zip pkg/"$ZIP_FILE"
 
-          echo "path=${ARTIFACT_NAME}" >> "$GITHUB_OUTPUT"
+          echo "name=pkg/${ZIP_FILE}" >> "$GITHUB_OUTPUT"
+          echo "path=${ZIP_FILE}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
-          name: ${{ steps.build-binary.outputs.path }}
+          name: ${{ steps.build-binary.outputs.name }}
           path: ${{ steps.build-binary.outputs.path }}
