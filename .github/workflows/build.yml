@@ -74,8 +74,8 @@ jobs:
           make zip
           mv pkg/${{ env.PKG_NAME }}.zip pkg/"$ZIP_FILE"
 
-          echo "name=pkg/${ZIP_FILE}" >> "$GITHUB_OUTPUT"
-          echo "path=${ZIP_FILE}" >> "$GITHUB_OUTPUT"
+          echo "name=${ZIP_FILE}" >> "$GITHUB_OUTPUT"
+          echo "path=pkg/${ZIP_FILE}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
