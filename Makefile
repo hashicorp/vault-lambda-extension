@@ -14,7 +14,8 @@ build: clean
 		.
 
 zip: build
-	cd pkg && zip -r vault-lambda-extension.zip extensions/
+	cp LICENSE pkg/LICENSE.txt
+	cd pkg && zip -r vault-lambda-extension.zip LICENSE.txt extensions/
 	@echo "Extension built: pkg/vault-lambda-extension.zip"
 
 lint:
