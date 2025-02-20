@@ -1,5 +1,33 @@
 ## Unreleased
 
+## 0.11.0 (Feb 20, 2025)
+
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:21
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:9
+```
+
+IMPROVEMENTS:
+
+* Building with Go 1.23.6
+* Bumped versions for the following dependencies:
+  * github.com/aws/aws-sdk-go v1.55.6
+  * github.com/hashicorp/vault/api v1.15.0
+  * github.com/hashicorp/vault/sdk v1.15.0
+  * github.com/stretchr/testify v1.10.0
+  * golang.org/x/crypto v0.33.0
+  * golang.org/x/net v0.35.0
+  * golang.org/x/sys v0.30.0
+  * golang.org/x/text v0.22.0
+  * github.com/cenkalti/backoff/v4 v4.3.0
+  * github.com/fatih/color v1.17.0
+  * github.com/go-jose/go-jose/v4 v4.0.4
+  * github.com/hashicorp/go-secure-stdlib/parseutil v0.1.9
+  * github.com/hashicorp/go-sockaddr v1.0.6
+  * golang.org/x/time v0.9.0
+  * golang.org/x/text v0.7.0
+
 ## 0.11.0 (Sept 6, 2024)
 
 LAYERS:
