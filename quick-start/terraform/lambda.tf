@@ -10,7 +10,7 @@ resource "aws_lambda_function" "function" {
   runtime       = "provided.al2"
   architectures = ["x86_64"]
   layers        = var.local_extension ? ["${aws_lambda_layer_version.vle[0].arn}"] : [
-    "arn:aws:lambda:${var.aws_region}:634166935893:layer:vault-lambda-extension:20"
+    "arn:aws:lambda:${var.aws_region}:634166935893:layer:vault-lambda-extension:21"
   ]
 
   environment {
