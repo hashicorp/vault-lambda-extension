@@ -1,8 +1,6 @@
 module github.com/hashicorp/vault-ext-proto
 
-go 1.23.3
-
-toolchain go1.24.3
+go 1.24.3
 
 require (
 	github.com/aws/aws-lambda-go v1.19.1

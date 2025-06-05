@@ -1,8 +1,6 @@
 module github.com/hashicorp/vault-lambda-extension
 
-go 1.23.3
-
-toolchain go1.24.3
+go 1.24.3
 
 require (
 	github.com/aws/aws-sdk-go v1.55.6
