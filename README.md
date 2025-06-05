@@ -18,13 +18,13 @@ Lambda function, depending on your desired architecture.
 amd64 (x86_64):
 
 ```text
-arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:20
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension:21
 ```
 
 arm64:
 
 ```text
-arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension-arm64:8
+arn:aws:lambda:<your-region>:634166935893:layer:vault-lambda-extension-arm64:9
 ```
 
 Where region may be any of
