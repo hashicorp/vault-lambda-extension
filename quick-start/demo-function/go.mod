@@ -1,7 +1,6 @@
 module github.com/hashicorp/vault-ext-proto
 
-go 1.22
-toolchain go1.24.1
+go 1.24.3
 
 require (
 	github.com/aws/aws-lambda-go v1.19.1
@@ -11,7 +10,7 @@ require (
 
 require (
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect

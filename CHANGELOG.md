@@ -1,5 +1,22 @@
 ## Unreleased
 
+## 0.13.0 (Jun 5, 2025)
+
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:22
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:10
+```
+
+IMPROVEMENTS:
+
+* Bumped versions for the following dependencies:
+  * golang.org/x/net v0.38.0
+  * golang.org/x/crypto v0.36.0
+  * golang.org/x/sys v0.31.0
+  * golang.org/x/text v0.23.0
+  * github.com/go-jose/go-jose/v4 v4.0.5
+
 ## 0.12.0 (Feb 20, 2025)
 
 LAYERS:
