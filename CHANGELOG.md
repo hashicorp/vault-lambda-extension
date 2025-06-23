@@ -1,5 +1,17 @@
 ## Unreleased
 
+## 0.13.1 (Jun 23, 2025)
+
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:23
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:11
+```
+
+BUGS:
+
+* fix arm64 build and version metadata (https://github.com/hashicorp/vault-lambda-extension/pull/175)
+
 ## 0.13.0 (Jun 5, 2025)
 
 LAYERS:

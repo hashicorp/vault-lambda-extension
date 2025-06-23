@@ -68,6 +68,11 @@ jobs:
 
       - name: Build
         id: build-binary
+        # these env vars are required for the make command to build for each arch
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ needs.get-product-version.outputs.product-version }}
         run: |
           ZIP_FILE="${{ env.PKG_NAME }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip"
 
