@@ -1,5 +1,17 @@
 ## Unreleased
 
+## 0.13.2 (Oct 2, 2025)
+
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:24
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:12
+```
+
+IMPROVEMENTS:
+
+* Building with Go 1.25.1
+
 ## 0.13.1 (Jun 23, 2025)
 
 LAYERS:

@@ -17,26 +17,9 @@ jobs:
           echo "Building with Go $(cat .go-version)"
           echo "::set-output name=go-version::$(cat .go-version)"
 
-  golangci:
-    name: lint
-    needs:
-      - get-go-version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version: ${{ needs.get-go-version.outputs.go-version }}
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@aaa42aa0628b4ae2578232a66b541047968fac86 # v6.1.0
-        with:
-          args: |
-            -v --concurrency 2 \
-            --disable-all \
-            --timeout 10m \
-            --enable gofmt \
-            --enable gosimple \
-            --enable govet
+  run-go-checks:
+    # using `main` as the ref will keep your workflow up-to-date
+    uses: hashicorp/vault-workflows-common/.github/workflows/go-checks.yaml@main
 
   run-tests:
     # using `main` as the ref will keep your workflow up-to-date
