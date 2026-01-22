@@ -1,4 +1,4 @@
-# Copyright (c) HashiCorp, Inc.
+# Copyright IBM Corp. 2020, 2025
 # SPDX-License-Identifier: MPL-2.0
 
 FROM docker.mirror.hashicorp.services/golang:1.15-alpine3.13 as builder
