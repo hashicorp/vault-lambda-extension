@@ -1,5 +1,23 @@
 ## Unreleased
 
+## 0.14.0 (Mar 10, 2026)
+
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:25
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:13
+```
+
+IMPROVEMENTS:
+
+* Building with Go 1.25.7
+* Bumped versions for the following dependencies:
+  * golang.org/x/crypto v0.47.0
+	* golang.org/x/net v0.49.0
+	* golang.org/x/sys v0.40.0
+	* golang.org/x/text v0.33.0
+	* golang.org/x/time v0.14.0 
+
 ## 0.13.2 (Oct 2, 2025)
 
 LAYERS:
