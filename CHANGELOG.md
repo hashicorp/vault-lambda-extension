@@ -13,10 +13,10 @@ IMPROVEMENTS:
 * Building with Go 1.25.7
 * Bumped versions for the following dependencies:
   * golang.org/x/crypto v0.47.0
-	* golang.org/x/net v0.49.0
-	* golang.org/x/sys v0.40.0
-	* golang.org/x/text v0.33.0
-	* golang.org/x/time v0.14.0 
+  * golang.org/x/net v0.49.0
+  * golang.org/x/sys v0.40.0
+  * golang.org/x/text v0.33.0
+  * golang.org/x/time v0.14.0 
 
 ## 0.13.2 (Oct 2, 2025)
 
