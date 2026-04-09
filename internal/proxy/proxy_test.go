@@ -4,6 +4,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,9 +15,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/vault-lambda-extension/internal/config"
+	internalconfig "github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/api"
@@ -63,10 +65,13 @@ var (
 func TestProxy(t *testing.T) {
 	fakeVault := fakeVault()
 	defer fakeVault.Close()
-	ses := session.Must(session.NewSession())
-	sts := ststest.FakeSTS(ses)
+	awsCfg, err := awsconfig.LoadDefaultConfig(context.TODO(),
+		awsconfig.WithRegion("us-west-2"),
+	)
+	require.NoError(t, err, "failed to load AWS config")
+	sts := ststest.FakeSTS(&awsCfg)
 	defer sts.Close()
-	proxyAddr, close := startProxy(t, fakeVault.URL, ses)
+	proxyAddr, close := startProxy(t, fakeVault.URL, awsCfg)
 	defer close()
 
 	t.Run("happy path bare http client", func(t *testing.T) {
@@ -146,16 +151,16 @@ func TestProxy(t *testing.T) {
 	})
 }
 
-func startProxy(t *testing.T, vaultAddress string, ses *session.Session) (string, func() error) {
+func startProxy(t *testing.T, vaultAddress string, awsCfg aws.Config) (string, func() error) {
 	vaultConfig := api.DefaultConfig()
 	require.NoError(t, vaultConfig.Error)
 	vaultConfig.Address = vaultAddress
-	client, err := vault.NewClient("", "", hclog.NewNullLogger(), vaultConfig, config.AuthConfig{}, ses)
+	client, err := vault.NewClient("", "", hclog.NewNullLogger(), vaultConfig, internalconfig.AuthConfig{}, awsCfg)
 	require.NoError(t, err)
 	client.VaultConfig.Address = vaultAddress
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	proxy := New(hclog.NewNullLogger(), client, config.CacheConfig{})
+	proxy := New(hclog.NewNullLogger(), client, internalconfig.CacheConfig{})
 	go func() {
 		_ = proxy.Serve(ln)
 	}()
