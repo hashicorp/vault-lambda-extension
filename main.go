@@ -17,9 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/session"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/api"
 
@@ -126,16 +124,17 @@ func (h *handler) runExtension(ctx context.Context, wg *sync.WaitGroup) (func(co
 		return nil, errors.New("missing VLE_VAULT_ADDR, VAULT_ADDR, VAULT_AUTH_PROVIDER or VAULT_AUTH_ROLE environment variables")
 	}
 
-	var ses *session.Session
+	awsLoadOptions := []func(*awsconfig.LoadOptions) error{}
 	if authConfig.STSEndpointRegion != "" {
-		ses = session.Must(session.NewSession(&aws.Config{
-			Region:              aws.String(authConfig.STSEndpointRegion),
-			STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
-		}))
-	} else {
-		ses = session.Must(session.NewSession())
+		awsLoadOptions = append(awsLoadOptions, awsconfig.WithRegion(authConfig.STSEndpointRegion))
 	}
-	client, err := vault.NewClient(config.ExtensionName, config.ExtensionVersion, h.logger.Named("vault-client"), vaultConfig, authConfig, ses)
+
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsLoadOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("error loading AWS SDK config: %w", err)
+	}
+
+	client, err := vault.NewClient(config.ExtensionName, config.ExtensionVersion, h.logger.Named("vault-client"), vaultConfig, authConfig, awsCfg)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
 	} else if client == nil {
