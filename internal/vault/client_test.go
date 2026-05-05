@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sts"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
@@ -45,8 +45,9 @@ var (
 func TestTokenRenewal(t *testing.T) {
 	vault := fakeVault()
 	defer vault.Close()
-	ses := session.Must(session.NewSession())
-	stsServer := ststest.FakeSTS(ses)
+	awsCfg, err := awsconfig.LoadDefaultConfig(context.TODO())
+	require.NoError(t, err)
+	stsServer := ststest.FakeSTS(&awsCfg)
 	defer stsServer.Close()
 
 	generateVaultClient := func() *api.Client {
@@ -56,7 +57,7 @@ func TestTokenRenewal(t *testing.T) {
 		require.NoError(t, err)
 		return vaultClient
 	}
-	stsSvc := sts.New(ses)
+	stsSvc := sts.NewFromConfig(awsCfg)
 
 	t.Run("TestExpired", func(t *testing.T) {
 		now := time.Now()

@@ -7,26 +7,20 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 )
 
-// FakeSTS creates a fake STS server, and configures the session passed in
+// FakeSTS creates a fake STS server, and configures the AWS config passed in
 // to talk to that server.
-func FakeSTS(ses *session.Session) *httptest.Server {
+func FakeSTS(cfg *aws.Config) *httptest.Server {
 	stsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	}))
 
-	ses.Config.
-		WithEndpoint(stsServer.URL).
-		WithRegion("us-east-1").
-		WithCredentials(credentials.NewStaticCredentialsFromCreds(credentials.Value{
-			ProviderName:    session.EnvProviderName,
-			AccessKeyID:     "foo",
-			SecretAccessKey: "foo",
-			SessionToken:    "foo",
-		}))
+	cfg.BaseEndpoint = aws.String(stsServer.URL)
+	cfg.Region = "us-east-1"
+	cfg.Credentials = aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider("foo", "foo", "foo"))
 
 	return stsServer
 }
