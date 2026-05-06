@@ -3,7 +3,7 @@
 
 FROM docker.io/hashicorp/vault:1.21.1 AS vault
 
-FROM docker.mirror.hashicorp.services/golang:1.26-alpine AS builder
+FROM docker.mirror.hashicorp.services/golang:1.25.7-alpine AS builder
 
 COPY . /go/src/
 WORKDIR /go/src/
