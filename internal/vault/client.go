@@ -133,7 +133,7 @@ func (c *Client) login(ctx context.Context) error {
 			RoleSessionName: aws.String(sessionName),
 		})
 		if err != nil {
-			return fmt.Errorf("failed to assume role with arn of %s %w", roleToAssumeArn, err)
+			return fmt.Errorf("failed to assume role with arn of %s: %w", roleToAssumeArn, err)
 		}
 		if result.Credentials == nil {
 			return fmt.Errorf("failed to assume role with arn of %s: no credentials returned", roleToAssumeArn)
