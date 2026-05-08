@@ -69,8 +69,8 @@ func TestProxy(t *testing.T) {
 	require.NoError(t, err, "failed to load AWS config ")
 	sts := ststest.FakeSTS(&awsCfg)
 	defer sts.Close()
-	proxyAddr, close := startProxy(t, fakeVault.URL, awsCfg)
-	defer close()
+	proxyAddr, cleanup := startProxy(t, fakeVault.URL, awsCfg)
+	defer cleanup()
 
 	t.Run("happy path bare http client", func(t *testing.T) {
 		// reset request array
