@@ -161,7 +161,7 @@ func (c *Client) login(ctx context.Context) error {
 	}
 	stsEndpoint, err := resolvedSTSEndpointURL(ctx, stsSvc)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve STS endpoint URL: %w", err)
 	}
 
 	body := "Action=GetCallerIdentity&Version=2011-06-15"
@@ -169,7 +169,7 @@ func (c *Client) login(ctx context.Context) error {
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, stsEndpoint, strings.NewReader(body))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to build STS GetCallerIdentity request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if c.authConfig.IAMServerID != "" {
@@ -178,15 +178,15 @@ func (c *Client) login(ctx context.Context) error {
 
 	creds, err := stsOptions.Credentials.Retrieve(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve AWS credentials for STS request signing: %w", err)
 	}
 	if err := v4.NewSigner().SignHTTP(ctx, creds, httpReq, bodyHash, "sts", stsRegion, time.Now()); err != nil {
-		return err
+		return fmt.Errorf("failed to sign STS GetCallerIdentity request: %w", err)
 	}
 
 	headers, err := json.Marshal(httpReq.Header)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal signed STS request headers: %w", err)
 	}
 
 	d := make(map[string]interface{})
@@ -198,7 +198,7 @@ func (c *Client) login(ctx context.Context) error {
 
 	secret, err := c.VaultClient.Logical().Write(fmt.Sprintf("auth/%s/login", c.authConfig.Provider), d)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to authenticate with Vault IAM auth provider %q: %w", c.authConfig.Provider, err)
 	}
 	if secret == nil {
 		return fmt.Errorf("got no response from the %s authentication provider", c.authConfig.Provider)
@@ -235,7 +235,7 @@ func resolvedSTSEndpointURL(ctx context.Context, stsSvc *sts.Client) (string, er
 		UseGlobalEndpoint: aws.Bool(false),
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to resolve STS endpoint for region %q: %w", region, err)
 	}
 
 	u := endpoint.URI
