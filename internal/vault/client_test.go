@@ -14,7 +14,6 @@ import (
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
@@ -57,8 +56,6 @@ func TestTokenRenewal(t *testing.T) {
 		require.NoError(t, err)
 		return vaultClient
 	}
-	stsSvc := sts.NewFromConfig(awsCfg)
-
 	t.Run("TestExpired", func(t *testing.T) {
 		now := time.Now()
 		for _, tc := range []struct {
@@ -157,7 +154,7 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: generateVaultClient(),
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
+			awsCfg:      awsCfg,
 			authConfig: config.AuthConfig{
 				Provider: "aws",
 			},
@@ -180,7 +177,7 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: generateVaultClient(),
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
+			awsCfg:      awsCfg,
 			authConfig: config.AuthConfig{
 				Provider: "aws",
 			},
@@ -206,7 +203,7 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: generateVaultClient(),
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
+			awsCfg:      awsCfg,
 			authConfig: config.AuthConfig{
 				Provider: "aws",
 			},
@@ -227,7 +224,6 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: vaultClient,
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
 
 			tokenRenewable: true,
 			tokenExpiry:    time.Now().Add(time.Hour),
@@ -258,7 +254,6 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: vaultClient,
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
 
 			tokenRenewable: true,
 			tokenExpiry:    time.Now().Add(time.Hour),
@@ -284,7 +279,6 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: vaultClient,
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
 
 			tokenRenewable: false,
 			tokenExpiry:    time.Now().Add(time.Hour),
