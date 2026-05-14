@@ -67,8 +67,8 @@ func TestProxy(t *testing.T) {
 	defer fakeVault.Close()
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.TODO())
 	require.NoError(t, err, "failed to load AWS config ")
-	sts := ststest.FakeSTS(&awsCfg)
-	defer sts.Close()
+	fakeSTS := ststest.FakeSTS(&awsCfg)
+	defer fakeSTS.Close()
 	proxyAddr, cleanup := startProxy(t, fakeVault.URL, awsCfg)
 	defer cleanup()
 
