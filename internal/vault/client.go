@@ -172,7 +172,7 @@ func (c *Client) login(ctx context.Context) error {
 
 	token, err := secret.TokenID()
 	if err != nil {
-		return fmt.Errorf("error reading token: %s", err)
+		return fmt.Errorf("error reading token: %w", err)
 	}
 	c.VaultClient.SetToken(token)
 
