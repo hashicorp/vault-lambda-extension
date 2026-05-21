@@ -227,7 +227,7 @@ func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig con
 	}, nil
 }
 
-// resolvedSTSEndpointURL resolves the concrete STS endpoint using the SDK's
+// resolveSTSEndpointURL resolves the concrete STS endpoint using the SDK's
 // endpoint resolver, then normalizes it to a URL safe for signing.
 func resolveSTSEndpointURL(ctx context.Context, opts sts.Options) (string, error) {
 	resolver := opts.EndpointResolverV2
