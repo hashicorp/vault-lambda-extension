@@ -51,7 +51,7 @@ func TestTokenRenewal(t *testing.T) {
 	defer vault.Close()
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.TODO())
 	require.NoError(t, err)
-	stsServer := ststest.FakeSTS(&awsCfg)
+	stsServer, awsCfg := ststest.FakeSTS(&awsCfg)
 	defer stsServer.Close()
 
 	generateVaultClient := func() *api.Client {
