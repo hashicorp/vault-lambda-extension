@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/api"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -81,7 +82,8 @@ func TestProxy(t *testing.T) {
 		// the stored request should be the one _from the proxy_ since it's stored by
 		// the (fake) vault.
 		require.Len(t, vaultRequests, 2)
-		require.Contains(t, vaultRequests[1].Header.Get("User-Agent"), proxyUserAgent)
+		assert.Contains(t, vaultRequests[0].URL.Path, "login")
+		assert.Contains(t, vaultRequests[1].Header.Get("User-Agent"), proxyUserAgent)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		defer resp.Body.Close()
@@ -138,7 +140,9 @@ func TestProxy(t *testing.T) {
 		// the stored request should be the one _from the proxy_ since it's stored by
 		// the (fake) vault.
 		// revoke should trigger another login call, and still get the secret
+		require.Len(t, vaultRequests, 2)
 		require.Contains(t, vaultRequests[0].URL.Path, "login")
+		require.Contains(t, vaultRequests[1].Header.Get("User-Agent"), proxyUserAgent)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		defer resp.Body.Close()
