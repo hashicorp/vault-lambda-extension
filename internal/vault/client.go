@@ -241,11 +241,10 @@ func resolveSTSEndpointURL(ctx context.Context, opts sts.Options) (string, error
 	}
 
 	endpoint, err := resolver.ResolveEndpoint(ctx, sts.EndpointParameters{
-		Region:            aws.String(region),
-		UseDualStack:      aws.Bool(opts.EndpointOptions.UseDualStackEndpoint == aws.DualStackEndpointStateEnabled),
-		UseFIPS:           aws.Bool(opts.EndpointOptions.UseFIPSEndpoint == aws.FIPSEndpointStateEnabled),
-		Endpoint:          opts.BaseEndpoint,
-		UseGlobalEndpoint: aws.Bool(false),
+		Region:       aws.String(region),
+		UseDualStack: aws.Bool(opts.EndpointOptions.UseDualStackEndpoint == aws.DualStackEndpointStateEnabled),
+		UseFIPS:      aws.Bool(opts.EndpointOptions.UseFIPSEndpoint == aws.FIPSEndpointStateEnabled),
+		Endpoint:     opts.BaseEndpoint,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve STS endpoint for region %q: %w", region, err)
