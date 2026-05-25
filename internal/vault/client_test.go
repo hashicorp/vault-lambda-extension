@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -19,6 +20,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	smithyendpoints "github.com/aws/smithy-go/endpoints"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
@@ -45,6 +47,21 @@ var (
 		},
 	}
 )
+
+type recordingSTSEndpointResolver struct {
+	regionSeen string
+}
+
+func (r *recordingSTSEndpointResolver) ResolveEndpoint(_ context.Context, params sts.EndpointParameters) (smithyendpoints.Endpoint, error) {
+	r.regionSeen = aws.ToString(params.Region)
+
+	u, err := url.Parse("https://sts.us-east-1.amazonaws.com")
+	if err != nil {
+		return smithyendpoints.Endpoint{}, err
+	}
+
+	return smithyendpoints.Endpoint{URI: *u}, nil
+}
 
 func TestTokenRenewal(t *testing.T) {
 	vault := fakeVault()
@@ -397,6 +414,17 @@ func TestBuildIAMAuthPayload_IncludesVaultIAMServerIDHeader(t *testing.T) {
 
 	headers := decodeIAMRequestHeaders(t, payload)
 	require.Equal(t, "vault.example.com", headers.Get("X-Vault-AWS-IAM-Server-ID"))
+}
+
+func TestResolveSTSEndpointURL_DefaultsRegionToUSEast1(t *testing.T) {
+	resolver := &recordingSTSEndpointResolver{}
+
+	endpoint, err := resolveSTSEndpointURL(context.Background(), sts.Options{
+		EndpointResolverV2: resolver,
+	})
+	require.NoError(t, err)
+	require.Equal(t, defaultSTSRegion, resolver.regionSeen)
+	require.Equal(t, "https://sts.us-east-1.amazonaws.com/", endpoint)
 }
 
 func TestLogin_MissingCredentialsProviderReturnsMeaningfulError(t *testing.T) {
