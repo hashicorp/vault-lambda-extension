@@ -22,5 +22,7 @@ func FakeSTS(cfg *aws.Config) (*httptest.Server, aws.Config) {
 	cfg.Region = "us-east-1"
 	cfg.Credentials = aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider("foo", "foo", "foo"))
 
-	return stsServer, *cfg
+	cpycfg := *cfg
+
+	return stsServer, cpycfg
 }
