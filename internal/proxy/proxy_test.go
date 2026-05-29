@@ -158,7 +158,6 @@ func startProxy(t *testing.T, vaultAddress string, awsCfg aws.Config) (string, f
 	vaultConfig := api.DefaultConfig()
 	require.NoError(t, vaultConfig.Error)
 	vaultConfig.Address = vaultAddress
-	//client, err := vault.NewClient("", "", hclog.NewNullLogger(), vaultConfig, internalconfig.AuthConfig{}, awsCfg)
 	authConfig := internalconfig.AuthConfig{
 		Provider: "aws",
 		Role:     "test-role",
