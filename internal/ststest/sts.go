@@ -14,15 +14,14 @@ import (
 // FakeSTS creates a fake STS server, and configures the AWS config passed in
 // to talk to that server.
 func FakeSTS(cfg *aws.Config) (*httptest.Server, aws.Config) {
+	cpycfg := *cfg
 	stsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	}))
 
-	cfg.BaseEndpoint = aws.String(stsServer.URL)
-	cfg.Region = "us-east-1"
-	cfg.Credentials = aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider("foo", "foo", "foo"))
-
-	cpycfg := *cfg
+	cpycfg.BaseEndpoint = aws.String(stsServer.URL)
+	cpycfg.Region = "us-east-1"
+	cpycfg.Credentials = aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider("foo", "foo", "foo"))
 
 	return stsServer, cpycfg
 }
