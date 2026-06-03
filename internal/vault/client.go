@@ -159,7 +159,7 @@ func (c *Client) login(ctx context.Context) error {
 
 	d, err := buildIAMAuthPayload(ctx, stsSvc, authConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to build the IAM auth payload for provider %q, please try again: %w", authConfig.Provider, err)
 	}
 
 	secret, err := c.VaultClient.Logical().Write(fmt.Sprintf("auth/%s/login", authConfig.Provider), d)
