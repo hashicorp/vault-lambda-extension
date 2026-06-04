@@ -1,5 +1,13 @@
 ## Unreleased
 
+IMPROVEMENTS:
+
+* Migrated AWS provider dependency from `aws-sdk-go` (v1) to `aws-sdk-go-v2` for improved performance and maintainability. (https://github.com/hashicorp/vault-lambda-extension/pull/191)
+* Bumped versions for the following dependencies:
+  * github.com/fatih/color v1.19.0
+  * github.com/mattn/go-colorable v0.1.14
+  * golang.org/x/sys v0.42.0
+
 ## 0.14.0 (Mar 10, 2026)
 
 LAYERS:
