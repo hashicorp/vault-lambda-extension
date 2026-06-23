@@ -4,17 +4,25 @@
 package vault
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	smithyendpoints "github.com/aws/smithy-go/endpoints"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
@@ -23,8 +31,9 @@ import (
 )
 
 var (
-	vaultRequests []*http.Request
-	secretFunc    func() (*api.Secret, error)
+	vaultRequests      []*http.Request
+	vaultRequestBodies [][]byte
+	secretFunc         func() (*api.Secret, error)
 
 	with1hLease = &api.Secret{
 		Auth: &api.SecretAuth{
@@ -42,11 +51,27 @@ var (
 	}
 )
 
+type recordingSTSEndpointResolver struct {
+	regionSeen string
+}
+
+func (r *recordingSTSEndpointResolver) ResolveEndpoint(_ context.Context, params sts.EndpointParameters) (smithyendpoints.Endpoint, error) {
+	r.regionSeen = aws.ToString(params.Region)
+
+	u, err := url.Parse("https://sts.us-east-1.amazonaws.com")
+	if err != nil {
+		return smithyendpoints.Endpoint{}, err
+	}
+
+	return smithyendpoints.Endpoint{URI: *u}, nil
+}
+
 func TestTokenRenewal(t *testing.T) {
 	vault := fakeVault()
 	defer vault.Close()
-	ses := session.Must(session.NewSession())
-	stsServer := ststest.FakeSTS(ses)
+	awsCfg, err := awsconfig.LoadDefaultConfig(context.TODO())
+	require.NoError(t, err)
+	stsServer, awsCfg := ststest.FakeSTS(&awsCfg)
 	defer stsServer.Close()
 
 	generateVaultClient := func() *api.Client {
@@ -56,8 +81,6 @@ func TestTokenRenewal(t *testing.T) {
 		require.NoError(t, err)
 		return vaultClient
 	}
-	stsSvc := sts.New(ses)
-
 	t.Run("TestExpired", func(t *testing.T) {
 		now := time.Now()
 		for _, tc := range []struct {
@@ -156,7 +179,7 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: generateVaultClient(),
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
+			awsCfg:      awsCfg,
 			authConfig: config.AuthConfig{
 				Provider: "aws",
 			},
@@ -179,7 +202,7 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: generateVaultClient(),
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
+			awsCfg:      awsCfg,
 			authConfig: config.AuthConfig{
 				Provider: "aws",
 			},
@@ -205,7 +228,7 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: generateVaultClient(),
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
+			awsCfg:      awsCfg,
 			authConfig: config.AuthConfig{
 				Provider: "aws",
 			},
@@ -226,7 +249,6 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: vaultClient,
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
 
 			tokenRenewable: true,
 			tokenExpiry:    time.Now().Add(time.Hour),
@@ -257,7 +279,6 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: vaultClient,
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
 
 			tokenRenewable: true,
 			tokenExpiry:    time.Now().Add(time.Hour),
@@ -283,7 +304,6 @@ func TestTokenRenewal(t *testing.T) {
 		c := Client{
 			VaultClient: vaultClient,
 			logger:      hclog.Default(),
-			stsSvc:      stsSvc,
 
 			tokenRenewable: false,
 			tokenExpiry:    time.Now().Add(time.Hour),
@@ -361,12 +381,168 @@ func TestUserAgentHeaderAddition(t *testing.T) {
 	})
 }
 
+func TestBuildIAMAuthPayload_SignedHeaders(t *testing.T) {
+	stsSvc := sts.NewFromConfig(aws.Config{
+		Region:       "us-east-1",
+		BaseEndpoint: aws.String("https://sts.us-east-1.amazonaws.com"),
+		Credentials: aws.NewCredentialsCache(
+			credentials.NewStaticCredentialsProvider("AKIDEXAMPLE", "secret", "session-token"),
+		),
+	})
+
+	payload, err := buildIAMAuthPayload(context.Background(), stsSvc, config.AuthConfig{Role: "example-role"})
+	require.NoError(t, err)
+
+	headers := decodeIAMRequestHeaders(t, payload)
+	authorization := headers.Get("Authorization")
+	require.Contains(t, authorization, "AWS4-HMAC-SHA256")
+	require.Contains(t, authorization, "Credential=AKIDEXAMPLE/")
+	require.NotEmpty(t, headers.Get("X-Amz-Date"))
+	require.Equal(t, "session-token", headers.Get("X-Amz-Security-Token"))
+}
+
+func TestBuildIAMAuthPayload_IncludesVaultIAMServerIDHeader(t *testing.T) {
+	stsSvc := sts.NewFromConfig(aws.Config{
+		Region:       "us-east-1",
+		BaseEndpoint: aws.String("https://sts.us-east-1.amazonaws.com"),
+		Credentials: aws.NewCredentialsCache(
+			credentials.NewStaticCredentialsProvider("AKIDEXAMPLE", "secret", "session-token"),
+		),
+	})
+
+	payload, err := buildIAMAuthPayload(context.Background(), stsSvc, config.AuthConfig{
+		IAMServerID: "vault.example.com",
+	})
+	require.NoError(t, err)
+
+	headers := decodeIAMRequestHeaders(t, payload)
+	require.Equal(t, "vault.example.com", headers.Get("X-Vault-AWS-IAM-Server-ID"))
+}
+
+func TestResolveSTSEndpointURL_DefaultsRegionToUSEast1(t *testing.T) {
+	resolver := &recordingSTSEndpointResolver{}
+
+	endpoint, err := resolveSTSEndpointURL(context.Background(), sts.Options{
+		EndpointResolverV2: resolver,
+	})
+	require.NoError(t, err)
+	require.Equal(t, defaultSTSRegion, resolver.regionSeen)
+	require.Equal(t, "https://sts.us-east-1.amazonaws.com/", endpoint)
+}
+
+func TestLogin_MissingCredentialsProviderReturnsMeaningfulError(t *testing.T) {
+	c := Client{
+		logger:     hclog.Default(),
+		awsCfg:     aws.Config{},
+		authConfig: config.AuthConfig{Provider: "aws"},
+	}
+
+	err := c.login(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `failed to authenticate with Vault IAM auth provider "aws": missing STS credentials provider`)
+}
+
+func TestToken_UsesAssumedRoleArnWithSTSEndpointRegion(t *testing.T) {
+	vault := fakeVault()
+	defer vault.Close()
+
+	stsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		if strings.Contains(string(body), "Action=AssumeRole") {
+			w.Header().Set("Content-Type", "text/xml")
+			_, writeErr := w.Write([]byte(`<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+	<AssumeRoleResult>
+		<Credentials>
+			<AccessKeyId>ASIAEXAMPLE</AccessKeyId>
+			<SecretAccessKey>assumed-role-secret</SecretAccessKey>
+			<SessionToken>assumed-role-session-token</SessionToken>
+			<Expiration>2030-01-01T00:00:00Z</Expiration>
+		</Credentials>
+		<AssumedRoleUser>
+			<AssumedRoleId>AROAEXAMPLE:vault_auth</AssumedRoleId>
+			<Arn>arn:aws:sts::123456789012:assumed-role/test-role/vault_auth</Arn>
+		</AssumedRoleUser>
+	</AssumeRoleResult>
+	<ResponseMetadata>
+		<RequestId>example-request-id</RequestId>
+	</ResponseMetadata>
+</AssumeRoleResponse>`))
+			require.NoError(t, writeErr)
+			return
+		}
+
+		http.Error(w, "unexpected STS action", http.StatusBadRequest)
+	}))
+	defer stsServer.Close()
+
+	vaultRequests = []*http.Request{}
+	vaultRequestBodies = [][]byte{}
+	secretFunc = generateSecretFunc(t, []*api.Secret{with1hLease})
+
+	vaultClient, err := api.NewClient(&api.Config{Address: vault.URL})
+	require.NoError(t, err)
+
+	c := Client{
+		VaultClient: vaultClient,
+		logger:      hclog.Default(),
+		awsCfg: aws.Config{
+			Region:       "us-east-1",
+			BaseEndpoint: aws.String(stsServer.URL),
+			Credentials: aws.NewCredentialsCache(
+				credentials.NewStaticCredentialsProvider("foo", "foo", "foo"),
+			),
+		},
+		authConfig: config.AuthConfig{
+			Provider:          "aws",
+			AssumedRoleArn:    "arn:aws:iam::123456789012:role/test-role",
+			STSEndpointRegion: "eu-west-1",
+		},
+	}
+
+	token, err := c.Token(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "foo-1h-token", token)
+	require.Equal(t, 1, len(vaultRequests))
+	require.Equal(t, "/v1/auth/aws/login", vaultRequests[0].URL.Path)
+
+	payload := decodeVaultRequestPayload(t, vaultRequestBodies[0])
+	headers := decodeIAMRequestHeaders(t, payload)
+	require.Contains(t, headers.Get("Authorization"), "/eu-west-1/sts/")
+}
+
+func decodeIAMRequestHeaders(t *testing.T, payload map[string]interface{}) http.Header {
+	t.Helper()
+
+	encodedHeaders, ok := payload["iam_request_headers"].(string)
+	require.True(t, ok)
+
+	headersBytes, err := base64.StdEncoding.DecodeString(encodedHeaders)
+	require.NoError(t, err)
+
+	var headers http.Header
+	require.NoError(t, json.Unmarshal(headersBytes, &headers))
+
+	// Header values include scheme and credential information generated by SigV4.
+	if strings.TrimSpace(headers.Get("Authorization")) == "" {
+		t.Fatalf("authorization header is missing in signed iam_request_headers")
+	}
+
+	return headers
+}
+
 func fakeUserAgent(_ *api.Request) string {
 	return userAgent
 }
 
 func fakeVault() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err == nil {
+			vaultRequestBodies = append(vaultRequestBodies, body)
+		}
+
 		defer func() {
 			vaultRequests = append(vaultRequests, r)
 		}()
@@ -386,6 +562,15 @@ func fakeVault() *httptest.Server {
 			return
 		}
 	}))
+}
+
+func decodeVaultRequestPayload(t *testing.T, body []byte) map[string]interface{} {
+	t.Helper()
+
+	var payload map[string]interface{}
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(body), &payload))
+
+	return payload
 }
 
 func generateSecretFunc(t *testing.T, secrets []*api.Secret) func() (*api.Secret, error) {

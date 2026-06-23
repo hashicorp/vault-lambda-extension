@@ -4,6 +4,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,12 +15,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/vault-lambda-extension/internal/config"
+	internalconfig "github.com/hashicorp/vault-lambda-extension/internal/config"
 	"github.com/hashicorp/vault-lambda-extension/internal/ststest"
 	"github.com/hashicorp/vault-lambda-extension/internal/vault"
 	"github.com/hashicorp/vault/api"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,11 +66,12 @@ var (
 func TestProxy(t *testing.T) {
 	fakeVault := fakeVault()
 	defer fakeVault.Close()
-	ses := session.Must(session.NewSession())
-	sts := ststest.FakeSTS(ses)
-	defer sts.Close()
-	proxyAddr, close := startProxy(t, fakeVault.URL, ses)
-	defer close()
+	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background())
+	require.NoError(t, err, "failed to load AWS config ")
+	fakeSTS, awsCfg := ststest.FakeSTS(&awsCfg)
+	defer fakeSTS.Close()
+	proxyAddr, cleanup := startProxy(t, fakeVault.URL, awsCfg)
+	defer cleanup()
 
 	t.Run("happy path bare http client", func(t *testing.T) {
 		// reset request array
@@ -77,7 +81,9 @@ func TestProxy(t *testing.T) {
 
 		// the stored request should be the one _from the proxy_ since it's stored by
 		// the (fake) vault.
-		require.Contains(t, vaultRequests[1].Header.Get("User-Agent"), proxyUserAgent)
+		require.Len(t, vaultRequests, 2)
+		assert.Contains(t, vaultRequests[0].URL.Path, "login")
+		assert.Contains(t, vaultRequests[1].Header.Get("User-Agent"), proxyUserAgent)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		defer resp.Body.Close()
@@ -134,7 +140,9 @@ func TestProxy(t *testing.T) {
 		// the stored request should be the one _from the proxy_ since it's stored by
 		// the (fake) vault.
 		// revoke should trigger another login call, and still get the secret
+		require.Len(t, vaultRequests, 2)
 		require.Contains(t, vaultRequests[0].URL.Path, "login")
+		require.Contains(t, vaultRequests[1].Header.Get("User-Agent"), proxyUserAgent)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		defer resp.Body.Close()
@@ -146,16 +154,20 @@ func TestProxy(t *testing.T) {
 	})
 }
 
-func startProxy(t *testing.T, vaultAddress string, ses *session.Session) (string, func() error) {
+func startProxy(t *testing.T, vaultAddress string, awsCfg aws.Config) (string, func() error) {
 	vaultConfig := api.DefaultConfig()
 	require.NoError(t, vaultConfig.Error)
 	vaultConfig.Address = vaultAddress
-	client, err := vault.NewClient("", "", hclog.NewNullLogger(), vaultConfig, config.AuthConfig{}, ses)
+	authConfig := internalconfig.AuthConfig{
+		Provider: "aws",
+		Role:     "test-role",
+	}
+	client, err := vault.NewClient("", "", hclog.NewNullLogger(), vaultConfig, authConfig, awsCfg)
 	require.NoError(t, err)
 	client.VaultConfig.Address = vaultAddress
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	proxy := New(hclog.NewNullLogger(), client, config.CacheConfig{})
+	proxy := New(hclog.NewNullLogger(), client, internalconfig.CacheConfig{})
 	go func() {
 		_ = proxy.Serve(ln)
 	}()

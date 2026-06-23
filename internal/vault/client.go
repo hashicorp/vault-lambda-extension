@@ -5,21 +5,20 @@ package vault
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/api"
 
@@ -29,6 +28,7 @@ import (
 const (
 	tokenExpiryGracePeriodEnv     = "VAULT_TOKEN_EXPIRY_GRACE_PERIOD"
 	defaultTokenExpiryGracePeriod = 10 * time.Second
+	defaultSTSRegion              = "us-east-1"
 )
 
 // Client holds api.Client and handles state required to renew tokens and re-auth as required.
@@ -42,7 +42,7 @@ type Client struct {
 	VaultConfig *api.Config
 
 	logger     hclog.Logger
-	stsSvc     *sts.STS
+	awsCfg     aws.Config
 	authConfig config.AuthConfig
 
 	// Token refresh/renew data.
@@ -55,7 +55,7 @@ type Client struct {
 
 // NewClient uses the AWS IAM auth method configured in a Vault cluster to
 // authenticate the execution role and create a Vault API client.
-func NewClient(name, version string, logger hclog.Logger, vaultConfig *api.Config, authConfig config.AuthConfig, awsSes *session.Session) (*Client, error) {
+func NewClient(name, version string, logger hclog.Logger, vaultConfig *api.Config, authConfig config.AuthConfig, awsCfg aws.Config) (*Client, error) {
 	vaultClient, err := api.NewClient(vaultConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error making extension: %w", err)
@@ -73,7 +73,7 @@ func NewClient(name, version string, logger hclog.Logger, vaultConfig *api.Confi
 		Version:     version,
 
 		logger:     logger,
-		stsSvc:     sts.New(awsSes),
+		awsCfg:     awsCfg,
 		authConfig: authConfig,
 
 		tokenExpiryGracePeriod: expiryGracePeriod,
@@ -115,10 +115,10 @@ func (c *Client) RevokeToken() {
 
 // login authenticates to Vault using IAM auth, and sets the client's token.
 func (c *Client) login(ctx context.Context) error {
-	authConfig := config.AuthConfigFromEnv()
+	authConfig := c.authConfig
 	roleToAssumeArn := authConfig.AssumedRoleArn
 
-	stsSvc := c.stsSvc
+	stsSvc := sts.NewFromConfig(c.awsCfg)
 
 	/* If passing in a role (through VAULT_ASSUMED_ROLE_ARN enviornment variable)
 	to be assumed for Vault authentication, use it instead of the function execution role */
@@ -126,76 +126,138 @@ func (c *Client) login(ctx context.Context) error {
 		c.logger.Debug(fmt.Sprintf("Trying to assume role with arn of %s to authenticate with Vault", roleToAssumeArn))
 		sessionName := "vault_auth"
 
-		result, err := c.stsSvc.AssumeRole(&sts.AssumeRoleInput{
-			RoleArn:         &roleToAssumeArn,
-			RoleSessionName: &sessionName,
+		assumeRoleOutput, err := stsSvc.AssumeRole(ctx, &sts.AssumeRoleInput{
+			RoleArn:         aws.String(roleToAssumeArn),
+			RoleSessionName: aws.String(sessionName),
 		})
 		if err != nil {
-			return fmt.Errorf("failed to assume role with arn of %s %w", roleToAssumeArn, err)
+			return fmt.Errorf("failed to assume role with arn of %s: %w", roleToAssumeArn, err)
+		}
+		if assumeRoleOutput.Credentials == nil {
+			return fmt.Errorf("failed to assume role with arn of %s: no credentials returned", roleToAssumeArn)
 		}
 
-		c.logger.Debug(fmt.Sprintf("Assumed role successfully with token expiration time: %s ", result.Credentials.Expiration.String()))
+		c.logger.Debug(fmt.Sprintf("Assumed role successfully with token expiration time: %s ", aws.ToTime(assumeRoleOutput.Credentials.Expiration).String()))
 
-		var ses *session.Session
+		assumedRoleCfg := c.awsCfg.Copy()
 		if authConfig.STSEndpointRegion != "" {
-			ses = session.Must(session.NewSession(&aws.Config{
-				Region:              aws.String(authConfig.STSEndpointRegion),
-				STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
-				Credentials:         credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
-			}))
-		} else {
-			ses = session.Must(session.NewSession(&aws.Config{
-				Credentials: credentials.NewStaticCredentials(*result.Credentials.AccessKeyId, *result.Credentials.SecretAccessKey, *result.Credentials.SessionToken),
-			}))
+			assumedRoleCfg.Region = authConfig.STSEndpointRegion
 		}
+		assumedRoleCfg.Credentials = aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(
+			aws.ToString(assumeRoleOutput.Credentials.AccessKeyId),
+			aws.ToString(assumeRoleOutput.Credentials.SecretAccessKey),
+			aws.ToString(assumeRoleOutput.Credentials.SessionToken),
+		))
 
-		stsSvc = sts.New(ses)
+		stsSvc = sts.NewFromConfig(assumedRoleCfg)
 	}
 
-	// ignore out
-	req, _ := stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
-	req.SetContext(ctx)
-
-	if c.authConfig.IAMServerID != "" {
-		req.HTTPRequest.Header.Add("X-Vault-AWS-IAM-Server-ID", c.authConfig.IAMServerID)
+	stsOptions := stsSvc.Options()
+	if stsOptions.Credentials == nil {
+		return fmt.Errorf("failed to authenticate with Vault IAM auth provider %q: missing STS credentials provider", authConfig.Provider)
 	}
 
-	if signErr := req.Sign(); signErr != nil {
-		return signErr
-	}
-
-	headers, err := json.Marshal(req.HTTPRequest.Header)
+	d, err := buildIAMAuthPayload(ctx, stsSvc, authConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to build the IAM auth payload for provider %q, please try again: %w", authConfig.Provider, err)
 	}
 
-	body, err := io.ReadAll(req.HTTPRequest.Body)
+	secret, err := c.VaultClient.Logical().Write(fmt.Sprintf("auth/%s/login", authConfig.Provider), d)
 	if err != nil {
-		return err
-	}
-
-	d := make(map[string]interface{})
-	d["iam_http_request_method"] = req.HTTPRequest.Method
-	d["iam_request_url"] = base64.StdEncoding.EncodeToString([]byte(req.HTTPRequest.URL.String()))
-	d["iam_request_headers"] = base64.StdEncoding.EncodeToString(headers)
-	d["iam_request_body"] = base64.StdEncoding.EncodeToString(body)
-	d["role"] = c.authConfig.Role
-
-	secret, err := c.VaultClient.Logical().Write(fmt.Sprintf("auth/%s/login", c.authConfig.Provider), d)
-	if err != nil {
-		return err
+		return fmt.Errorf("failed to authenticate with Vault IAM auth provider %q: %w", authConfig.Provider, err)
 	}
 	if secret == nil {
-		return fmt.Errorf("got no response from the %s authentication provider", c.authConfig.Provider)
+		return fmt.Errorf("got no response from the %s authentication provider", authConfig.Provider)
 	}
 
 	token, err := secret.TokenID()
 	if err != nil {
-		return fmt.Errorf("error reading token: %s", err)
+		return fmt.Errorf("error reading token: %w", err)
 	}
 	c.VaultClient.SetToken(token)
 
 	return c.updateTokenMetadata(secret)
+}
+
+// buildIAMAuthPayload builds and signs a GetCallerIdentity request, then packages
+// it into the payload expected by Vault's AWS IAM auth login endpoint.
+func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig config.AuthConfig) (map[string]interface{}, error) {
+	stsOptions := stsSvc.Options()
+	stsRegion := stsOptions.Region
+	if stsRegion == "" {
+		stsRegion = defaultSTSRegion
+	}
+
+	stsEndpoint, err := resolveSTSEndpointURL(ctx, stsOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve STS endpoint URL: %w", err)
+	}
+
+	body := "Action=GetCallerIdentity&Version=2011-06-15"
+	bodyHash := fmt.Sprintf("%x", sha256.Sum256([]byte(body)))
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, stsEndpoint, strings.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to build STS GetCallerIdentity request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if authConfig.IAMServerID != "" {
+		httpReq.Header.Set("X-Vault-AWS-IAM-Server-ID", authConfig.IAMServerID)
+	}
+
+	creds, err := stsOptions.Credentials.Retrieve(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve AWS credentials for STS request signing: %w", err)
+	}
+	if err := v4.NewSigner().SignHTTP(ctx, creds, httpReq, bodyHash, "sts", stsRegion, time.Now()); err != nil {
+		return nil, fmt.Errorf("failed to sign STS GetCallerIdentity request: %w", err)
+	}
+
+	headers, err := json.Marshal(httpReq.Header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal signed STS request headers: %w", err)
+	}
+
+	return map[string]interface{}{
+		"iam_http_request_method": http.MethodPost,
+		"iam_request_url":         base64.StdEncoding.EncodeToString([]byte(stsEndpoint)),
+		"iam_request_headers":     base64.StdEncoding.EncodeToString(headers),
+		"iam_request_body":        base64.StdEncoding.EncodeToString([]byte(body)),
+		"role":                    authConfig.Role,
+	}, nil
+}
+
+// resolveSTSEndpointURL resolves the concrete STS endpoint using the SDK's
+// endpoint resolver, then normalizes it to a URL safe for signing.
+func resolveSTSEndpointURL(ctx context.Context, opts sts.Options) (string, error) {
+	resolver := opts.EndpointResolverV2
+	if resolver == nil {
+		resolver = sts.NewDefaultEndpointResolverV2()
+	}
+
+	region := opts.Region
+	if region == "" {
+		region = defaultSTSRegion
+	}
+
+	endpoint, err := resolver.ResolveEndpoint(ctx, sts.EndpointParameters{
+		Region:       aws.String(region),
+		UseDualStack: aws.Bool(opts.EndpointOptions.UseDualStackEndpoint == aws.DualStackEndpointStateEnabled),
+		UseFIPS:      aws.Bool(opts.EndpointOptions.UseFIPSEndpoint == aws.FIPSEndpointStateEnabled),
+		Endpoint:     opts.BaseEndpoint,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve STS endpoint for region %q: %w", region, err)
+	}
+
+	u := endpoint.URI
+	u.RawQuery = ""
+	u.Fragment = ""
+	if u.Path == "" {
+		u.Path = "/"
+	}
+
+	return u.String(), nil
 }
 
 func (c *Client) renew() error {

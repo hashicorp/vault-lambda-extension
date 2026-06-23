@@ -1,9 +1,9 @@
 # Copyright IBM Corp. 2020, 2025
 # SPDX-License-Identifier: MPL-2.0
 
-FROM docker.mirror.hashicorp.services/vault:1.6.2 as vault
+FROM docker.io/hashicorp/vault:1.21.1 AS vault
 
-FROM docker.mirror.hashicorp.services/golang:1.15-alpine3.13 as builder
+FROM docker.mirror.hashicorp.services/golang:1.25.7-alpine AS builder
 
 COPY . /go/src/
 WORKDIR /go/src/
