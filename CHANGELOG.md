@@ -6,7 +6,11 @@ IMPROVEMENTS:
 * Bumped versions for the following dependencies:
   * github.com/fatih/color v1.19.0
   * github.com/mattn/go-colorable v0.1.14
-  * golang.org/x/sys v0.42.0
+  * golang.org/x/sys v0.46.0
+  * golang.org/x/crypto v0.53.0
+  * golang.org/x/net v0.56.0
+  * golang.org/x/text v0.38.0
+  * github.com/go-jose/go-jose/v4 v4.1.4
 
 ## 0.14.0 (Mar 10, 2026)
 
