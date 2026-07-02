@@ -438,18 +438,19 @@ func TestBuildIAMAuthPayload_DefaultPathUsesGlobalEndpointAndUSEast1Signing(t *t
 	require.True(t, ok)
 	urlBytes, err := base64.StdEncoding.DecodeString(encodedURL)
 	require.NoError(t, err)
-	require.Equal(t, defaultSTSGlobalEndpoint, string(urlBytes))
+	require.Equal(t, "https://sts.amazonaws.com/", string(urlBytes))
 }
 
 func TestResolveSTSEndpointURL_DefaultsRegionToUSEast1(t *testing.T) {
 	resolver := &recordingSTSEndpointResolver{}
 
-	endpoint, err := resolveSTSEndpointURL(context.Background(), sts.Options{
+	endpointURL, signingRegion, err := resolveSTSEndpoint(context.Background(), sts.Options{
 		EndpointResolverV2: resolver,
 	})
 	require.NoError(t, err)
 	require.Equal(t, defaultSTSRegion, resolver.regionSeen)
-	require.Equal(t, "https://sts.us-east-1.amazonaws.com/", endpoint)
+	require.Equal(t, "https://sts.us-east-1.amazonaws.com/", endpointURL)
+	require.Equal(t, defaultSTSRegion, signingRegion)
 }
 
 func TestLogin_MissingCredentialsProviderReturnsMeaningfulError(t *testing.T) {
@@ -531,7 +532,7 @@ func TestToken_UsesAssumedRoleArnWithSTSEndpointRegion(t *testing.T) {
 
 	payload := decodeVaultRequestPayload(t, vaultRequestBodies[0])
 	headers := decodeIAMRequestHeaders(t, payload)
-	require.Contains(t, headers.Get("Authorization"), "/us-east-1/sts/")
+	require.Contains(t, headers.Get("Authorization"), "/eu-west-1/sts/")
 }
 
 func decodeIAMRequestHeaders(t *testing.T, payload map[string]interface{}) http.Header {
