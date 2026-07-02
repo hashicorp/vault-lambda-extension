@@ -419,6 +419,28 @@ func TestBuildIAMAuthPayload_IncludesVaultIAMServerIDHeader(t *testing.T) {
 	require.Equal(t, "vault.example.com", headers.Get("X-Vault-AWS-IAM-Server-ID"))
 }
 
+func TestBuildIAMAuthPayload_DefaultPathUsesGlobalEndpointAndUSEast1Signing(t *testing.T) {
+	stsSvc := sts.NewFromConfig(aws.Config{
+		Region: "ap-south-1",
+		Credentials: aws.NewCredentialsCache(
+			credentials.NewStaticCredentialsProvider("AKIDEXAMPLE", "secret", "session-token"),
+		),
+	})
+
+	payload, err := buildIAMAuthPayload(context.Background(), stsSvc, config.AuthConfig{Role: "example-role"})
+	require.NoError(t, err)
+
+	headers := decodeIAMRequestHeaders(t, payload)
+	require.Contains(t, headers.Get("Authorization"), "/us-east-1/sts/")
+	require.NotContains(t, headers.Get("Authorization"), "/ap-south-1/sts/")
+
+	encodedURL, ok := payload["iam_request_url"].(string)
+	require.True(t, ok)
+	urlBytes, err := base64.StdEncoding.DecodeString(encodedURL)
+	require.NoError(t, err)
+	require.Equal(t, defaultSTSGlobalEndpoint, string(urlBytes))
+}
+
 func TestResolveSTSEndpointURL_DefaultsRegionToUSEast1(t *testing.T) {
 	resolver := &recordingSTSEndpointResolver{}
 
@@ -509,7 +531,7 @@ func TestToken_UsesAssumedRoleArnWithSTSEndpointRegion(t *testing.T) {
 
 	payload := decodeVaultRequestPayload(t, vaultRequestBodies[0])
 	headers := decodeIAMRequestHeaders(t, payload)
-	require.Contains(t, headers.Get("Authorization"), "/eu-west-1/sts/")
+	require.Contains(t, headers.Get("Authorization"), "/us-east-1/sts/")
 }
 
 func decodeIAMRequestHeaders(t *testing.T, payload map[string]interface{}) http.Header {
