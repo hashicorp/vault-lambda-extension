@@ -29,6 +29,7 @@ const (
 	tokenExpiryGracePeriodEnv     = "VAULT_TOKEN_EXPIRY_GRACE_PERIOD"
 	defaultTokenExpiryGracePeriod = 10 * time.Second
 	defaultSTSRegion              = "us-east-1"
+	defaultSTSGlobalEndpoint      = "https://sts.amazonaws.com/"
 )
 
 // Client holds api.Client and handles state required to renew tokens and re-auth as required.
@@ -140,9 +141,6 @@ func (c *Client) login(ctx context.Context) error {
 		c.logger.Debug(fmt.Sprintf("Assumed role successfully with token expiration time: %s ", aws.ToTime(assumeRoleOutput.Credentials.Expiration).String()))
 
 		assumedRoleCfg := c.awsCfg.Copy()
-		if authConfig.STSEndpointRegion != "" {
-			assumedRoleCfg.Region = authConfig.STSEndpointRegion
-		}
 		assumedRoleCfg.Credentials = aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(
 			aws.ToString(assumeRoleOutput.Credentials.AccessKeyId),
 			aws.ToString(assumeRoleOutput.Credentials.SecretAccessKey),
@@ -183,14 +181,18 @@ func (c *Client) login(ctx context.Context) error {
 // it into the payload expected by Vault's AWS IAM auth login endpoint.
 func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig config.AuthConfig) (map[string]interface{}, error) {
 	stsOptions := stsSvc.Options()
-	stsRegion := stsOptions.Region
-	if stsRegion == "" {
-		stsRegion = defaultSTSRegion
-	}
 
-	stsEndpoint, err := resolveSTSEndpointURL(ctx, stsOptions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve STS endpoint URL: %w", err)
+	// Use the global STS endpoint (us-east-1) for the signed IAM login payload
+	// unless the caller explicitly configured a custom STS endpoint.
+	stsEndpoint, stsRegion := defaultSTSGlobalEndpoint, defaultSTSRegion
+	if stsOptions.BaseEndpoint != nil {
+		var err error
+		if stsEndpoint, err = resolveSTSEndpointURL(ctx, stsOptions); err != nil {
+			return nil, fmt.Errorf("failed to resolve STS endpoint URL: %w", err)
+		}
+		if stsRegion = stsOptions.Region; stsRegion == "" {
+			stsRegion = defaultSTSRegion
+		}
 	}
 
 	body := "Action=GetCallerIdentity&Version=2011-06-15"
