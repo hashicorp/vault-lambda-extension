@@ -182,11 +182,17 @@ func (c *Client) login(ctx context.Context) error {
 // it into the payload expected by Vault's AWS IAM auth login endpoint.
 func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig config.AuthConfig) (map[string]interface{}, error) {
 	opts := stsSvc.Options()
+	// Default to the global STS endpoint when no custom endpoint is configured.
+	useGlobalEndpoint := opts.BaseEndpoint == nil
 	if authConfig.STSEndpointRegion != "" {
+		// Explicit STS endpoint region takes precedence over the client region.
+		// When a regional STS endpoint is requested, disable global endpoint mode so
+		// endpoint URL and SigV4 signing region stay aligned.
 		opts.Region = authConfig.STSEndpointRegion
+		useGlobalEndpoint = false
 	}
 
-	stsEndpoint, stsRegion, err := resolveSTSEndpoint(ctx, opts)
+	stsEndpoint, stsRegion, err := resolveSTSEndpoint(ctx, opts, useGlobalEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve STS endpoint URL: %w", err)
 	}
@@ -227,7 +233,7 @@ func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig con
 
 // resolveSTSEndpointURL resolves the concrete STS endpoint using the SDK's
 // endpoint resolver, then normalizes it to a URL safe for signing.
-func resolveSTSEndpoint(ctx context.Context, opts sts.Options) (endpointURL, signingRegion string, err error) {
+func resolveSTSEndpoint(ctx context.Context, opts sts.Options, useGlobalEndpoint bool) (endpointURL, signingRegion string, err error) {
 	resolver := opts.EndpointResolverV2
 	if resolver == nil {
 		resolver = sts.NewDefaultEndpointResolverV2()
@@ -235,6 +241,7 @@ func resolveSTSEndpoint(ctx context.Context, opts sts.Options) (endpointURL, sig
 
 	region := opts.Region
 	if region == "" {
+		// Keep AWS SDK default behavior when no explicit region is configured.
 		region = defaultSTSRegion
 	}
 
@@ -243,7 +250,7 @@ func resolveSTSEndpoint(ctx context.Context, opts sts.Options) (endpointURL, sig
 		UseDualStack:      aws.Bool(opts.EndpointOptions.UseDualStackEndpoint == aws.DualStackEndpointStateEnabled),
 		UseFIPS:           aws.Bool(opts.EndpointOptions.UseFIPSEndpoint == aws.FIPSEndpointStateEnabled),
 		Endpoint:          opts.BaseEndpoint,
-		UseGlobalEndpoint: aws.Bool(opts.BaseEndpoint == nil),
+		UseGlobalEndpoint: aws.Bool(useGlobalEndpoint),
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("failed to resolve STS endpoint for region %q: %w", region, err)

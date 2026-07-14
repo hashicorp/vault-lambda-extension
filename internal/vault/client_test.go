@@ -446,7 +446,7 @@ func TestResolveSTSEndpointURL_DefaultsRegionToUSEast1(t *testing.T) {
 
 	endpointURL, signingRegion, err := resolveSTSEndpoint(context.Background(), sts.Options{
 		EndpointResolverV2: resolver,
-	})
+	}, true) // useGlobalEndpoint=true when no BaseEndpoint is set
 	require.NoError(t, err)
 	require.Equal(t, defaultSTSRegion, resolver.regionSeen)
 	require.Equal(t, "https://sts.us-east-1.amazonaws.com/", endpointURL)
@@ -533,6 +533,64 @@ func TestToken_UsesAssumedRoleArnWithSTSEndpointRegion(t *testing.T) {
 	payload := decodeVaultRequestPayload(t, vaultRequestBodies[0])
 	headers := decodeIAMRequestHeaders(t, payload)
 	require.Contains(t, headers.Get("Authorization"), "/eu-west-1/sts/")
+}
+
+// TestToken_RegionalSTSEndpointWithoutBaseEndpoint verifies that when STSEndpointRegion
+// is set without BaseEndpoint (matching production config), the regional endpoint is used
+// and requests are signed for the correct region.
+func TestToken_RegionalSTSEndpointWithoutBaseEndpoint(t *testing.T) {
+	vault := fakeVault()
+	defer vault.Close()
+
+	vaultRequests = []*http.Request{}
+	vaultRequestBodies = [][]byte{}
+	secretFunc = generateSecretFunc(t, []*api.Secret{with1hLease})
+
+	vaultClient, err := api.NewClient(&api.Config{Address: vault.URL})
+	require.NoError(t, err)
+
+	// Mimic production config: Region is set via LoadDefaultConfig/WithRegion,
+	// but BaseEndpoint is NOT set.
+	c := Client{
+		VaultClient: vaultClient,
+		logger:      hclog.Default(),
+		awsCfg: aws.Config{
+			Region: "us-east-1", // Default region from SDK
+			Credentials: aws.NewCredentialsCache(
+				credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
+			),
+			// Notably: BaseEndpoint is NOT set, matching production
+		},
+		authConfig: config.AuthConfig{
+			Provider:          "aws",
+			STSEndpointRegion: "eu-west-1", // Regional endpoint requested
+		},
+	}
+
+	token, err := c.Token(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "foo-1h-token", token)
+	require.Equal(t, 1, len(vaultRequests))
+	require.Equal(t, "/v1/auth/aws/login", vaultRequests[0].URL.Path)
+
+	payload := decodeVaultRequestPayload(t, vaultRequestBodies[0])
+
+	// Verify the iam_request_url contains the regional endpoint
+	encodedURL, ok := payload["iam_request_url"].(string)
+	require.True(t, ok, "iam_request_url should be present")
+
+	urlBytes, err := base64.StdEncoding.DecodeString(encodedURL)
+	require.NoError(t, err)
+
+	requestURL := string(urlBytes)
+	require.Contains(t, requestURL, "sts.eu-west-1.amazonaws.com",
+		"iam_request_url should point to regional STS endpoint")
+
+	// Verify the Authorization header contains the correct region in signing scope
+	headers := decodeIAMRequestHeaders(t, payload)
+	authHeader := headers.Get("Authorization")
+	require.Contains(t, authHeader, "/eu-west-1/sts/",
+		"Authorization header should contain eu-west-1 region in signing scope")
 }
 
 func decodeIAMRequestHeaders(t *testing.T, payload map[string]interface{}) http.Header {
