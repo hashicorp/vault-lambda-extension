@@ -390,7 +390,7 @@ func TestBuildIAMAuthPayload_SignedHeaders(t *testing.T) {
 		),
 	})
 
-	payload, err := buildIAMAuthPayload(context.Background(), stsSvc, config.AuthConfig{Role: "example-role"})
+	payload, err := buildIAMAuthPayload(context.Background(), hclog.NewNullLogger(), stsSvc, config.AuthConfig{Role: "example-role"})
 	require.NoError(t, err)
 
 	headers := decodeIAMRequestHeaders(t, payload)
@@ -410,7 +410,7 @@ func TestBuildIAMAuthPayload_IncludesVaultIAMServerIDHeader(t *testing.T) {
 		),
 	})
 
-	payload, err := buildIAMAuthPayload(context.Background(), stsSvc, config.AuthConfig{
+	payload, err := buildIAMAuthPayload(context.Background(), hclog.NewNullLogger(), stsSvc, config.AuthConfig{
 		IAMServerID: "vault.example.com",
 	})
 	require.NoError(t, err)
@@ -427,7 +427,7 @@ func TestBuildIAMAuthPayload_DefaultPathUsesGlobalEndpointAndUSEast1Signing(t *t
 		),
 	})
 
-	payload, err := buildIAMAuthPayload(context.Background(), stsSvc, config.AuthConfig{Role: "example-role"})
+	payload, err := buildIAMAuthPayload(context.Background(), hclog.NewNullLogger(), stsSvc, config.AuthConfig{Role: "example-role"})
 	require.NoError(t, err)
 
 	headers := decodeIAMRequestHeaders(t, payload)

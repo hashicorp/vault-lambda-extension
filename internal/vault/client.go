@@ -156,7 +156,7 @@ func (c *Client) login(ctx context.Context) error {
 		return fmt.Errorf("failed to authenticate with Vault IAM auth provider %q: missing STS credentials provider", authConfig.Provider)
 	}
 
-	d, err := buildIAMAuthPayload(ctx, stsSvc, authConfig)
+	d, err := buildIAMAuthPayload(ctx, c.logger, stsSvc, authConfig)
 	if err != nil {
 		return fmt.Errorf("failed to build the IAM auth payload for provider %q, please try again: %w", authConfig.Provider, err)
 	}
@@ -180,21 +180,27 @@ func (c *Client) login(ctx context.Context) error {
 
 // buildIAMAuthPayload builds and signs a GetCallerIdentity request, then packages
 // it into the payload expected by Vault's AWS IAM auth login endpoint.
-func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig config.AuthConfig) (map[string]interface{}, error) {
+func buildIAMAuthPayload(ctx context.Context, logger hclog.Logger, stsSvc *sts.Client, authConfig config.AuthConfig) (map[string]interface{}, error) {
 	opts := stsSvc.Options()
-	// Default to the global STS endpoint when no custom endpoint is configured.
-	useGlobalEndpoint := opts.BaseEndpoint == nil
+	// useDefaultResolver indicates no custom BaseEndpoint has been configured, so
+	// the SDK's default endpoint resolution logic should decide the endpoint for
+	// the requested region.
+	useDefaultResolver := opts.BaseEndpoint == nil
 	if authConfig.STSEndpointRegion != "" {
 		// Explicit STS endpoint region takes precedence over the client region.
-		// When a regional STS endpoint is requested, disable global endpoint mode so
-		// endpoint URL and SigV4 signing region stay aligned.
+		// When a regional STS endpoint is requested, disable the default resolver's
+		// global-endpoint preference so endpoint URL and SigV4 signing region stay aligned.
 		opts.Region = authConfig.STSEndpointRegion
-		useGlobalEndpoint = false
+		useDefaultResolver = false
 	}
 
-	stsEndpoint, stsRegion, err := resolveSTSEndpoint(ctx, opts, useGlobalEndpoint)
+	stsEndpoint, stsRegion, err := resolveSTSEndpoint(ctx, opts, useDefaultResolver)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve STS endpoint URL: %w", err)
+	}
+
+	if logger != nil {
+		logger.Debug("resolved STS endpoint", "endpoint_url", stsEndpoint, "signing_region", stsRegion)
 	}
 
 	body := "Action=GetCallerIdentity&Version=2011-06-15"
@@ -233,7 +239,7 @@ func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig con
 
 // resolveSTSEndpointURL resolves the concrete STS endpoint using the SDK's
 // endpoint resolver, then normalizes it to a URL safe for signing.
-func resolveSTSEndpoint(ctx context.Context, opts sts.Options, useGlobalEndpoint bool) (endpointURL, signingRegion string, err error) {
+func resolveSTSEndpoint(ctx context.Context, opts sts.Options, useDefaultResolver bool) (endpointURL, signingRegion string, err error) {
 	resolver := opts.EndpointResolverV2
 	if resolver == nil {
 		resolver = sts.NewDefaultEndpointResolverV2()
@@ -250,7 +256,7 @@ func resolveSTSEndpoint(ctx context.Context, opts sts.Options, useGlobalEndpoint
 		UseDualStack:      aws.Bool(opts.EndpointOptions.UseDualStackEndpoint == aws.DualStackEndpointStateEnabled),
 		UseFIPS:           aws.Bool(opts.EndpointOptions.UseFIPSEndpoint == aws.FIPSEndpointStateEnabled),
 		Endpoint:          opts.BaseEndpoint,
-		UseGlobalEndpoint: aws.Bool(useGlobalEndpoint),
+		UseGlobalEndpoint: aws.Bool(useDefaultResolver),
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("failed to resolve STS endpoint for region %q: %w", region, err)
