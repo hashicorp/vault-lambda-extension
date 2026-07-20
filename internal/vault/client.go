@@ -19,6 +19,8 @@ import (
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	smithyauth "github.com/aws/smithy-go/auth"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/api"
 
@@ -140,9 +142,6 @@ func (c *Client) login(ctx context.Context) error {
 		c.logger.Debug(fmt.Sprintf("Assumed role successfully with token expiration time: %s ", aws.ToTime(assumeRoleOutput.Credentials.Expiration).String()))
 
 		assumedRoleCfg := c.awsCfg.Copy()
-		if authConfig.STSEndpointRegion != "" {
-			assumedRoleCfg.Region = authConfig.STSEndpointRegion
-		}
 		assumedRoleCfg.Credentials = aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(
 			aws.ToString(assumeRoleOutput.Credentials.AccessKeyId),
 			aws.ToString(assumeRoleOutput.Credentials.SecretAccessKey),
@@ -157,7 +156,7 @@ func (c *Client) login(ctx context.Context) error {
 		return fmt.Errorf("failed to authenticate with Vault IAM auth provider %q: missing STS credentials provider", authConfig.Provider)
 	}
 
-	d, err := buildIAMAuthPayload(ctx, stsSvc, authConfig)
+	d, err := buildIAMAuthPayload(ctx, c.logger, stsSvc, authConfig)
 	if err != nil {
 		return fmt.Errorf("failed to build the IAM auth payload for provider %q, please try again: %w", authConfig.Provider, err)
 	}
@@ -181,16 +180,27 @@ func (c *Client) login(ctx context.Context) error {
 
 // buildIAMAuthPayload builds and signs a GetCallerIdentity request, then packages
 // it into the payload expected by Vault's AWS IAM auth login endpoint.
-func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig config.AuthConfig) (map[string]interface{}, error) {
-	stsOptions := stsSvc.Options()
-	stsRegion := stsOptions.Region
-	if stsRegion == "" {
-		stsRegion = defaultSTSRegion
+func buildIAMAuthPayload(ctx context.Context, logger hclog.Logger, stsSvc *sts.Client, authConfig config.AuthConfig) (map[string]interface{}, error) {
+	opts := stsSvc.Options()
+	// useDefaultResolver indicates no custom BaseEndpoint has been configured, so
+	// the SDK's default endpoint resolution logic should decide the endpoint for
+	// the requested region.
+	useDefaultResolver := opts.BaseEndpoint == nil
+	if authConfig.STSEndpointRegion != "" {
+		// Explicit STS endpoint region takes precedence over the client region.
+		// When a regional STS endpoint is requested, disable the default resolver's
+		// global-endpoint preference so endpoint URL and SigV4 signing region stay aligned.
+		opts.Region = authConfig.STSEndpointRegion
+		useDefaultResolver = false
 	}
 
-	stsEndpoint, err := resolveSTSEndpointURL(ctx, stsOptions)
+	stsEndpoint, stsRegion, err := resolveSTSEndpoint(ctx, opts, useDefaultResolver)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve STS endpoint URL: %w", err)
+	}
+
+	if logger != nil {
+		logger.Debug("resolved STS endpoint", "endpoint_url", stsEndpoint, "signing_region", stsRegion)
 	}
 
 	body := "Action=GetCallerIdentity&Version=2011-06-15"
@@ -205,7 +215,7 @@ func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig con
 		httpReq.Header.Set("X-Vault-AWS-IAM-Server-ID", authConfig.IAMServerID)
 	}
 
-	creds, err := stsOptions.Credentials.Retrieve(ctx)
+	creds, err := opts.Credentials.Retrieve(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve AWS credentials for STS request signing: %w", err)
 	}
@@ -229,7 +239,7 @@ func buildIAMAuthPayload(ctx context.Context, stsSvc *sts.Client, authConfig con
 
 // resolveSTSEndpointURL resolves the concrete STS endpoint using the SDK's
 // endpoint resolver, then normalizes it to a URL safe for signing.
-func resolveSTSEndpointURL(ctx context.Context, opts sts.Options) (string, error) {
+func resolveSTSEndpoint(ctx context.Context, opts sts.Options, useDefaultResolver bool) (endpointURL, signingRegion string, err error) {
 	resolver := opts.EndpointResolverV2
 	if resolver == nil {
 		resolver = sts.NewDefaultEndpointResolverV2()
@@ -237,17 +247,19 @@ func resolveSTSEndpointURL(ctx context.Context, opts sts.Options) (string, error
 
 	region := opts.Region
 	if region == "" {
+		// Keep AWS SDK default behavior when no explicit region is configured.
 		region = defaultSTSRegion
 	}
 
 	endpoint, err := resolver.ResolveEndpoint(ctx, sts.EndpointParameters{
-		Region:       aws.String(region),
-		UseDualStack: aws.Bool(opts.EndpointOptions.UseDualStackEndpoint == aws.DualStackEndpointStateEnabled),
-		UseFIPS:      aws.Bool(opts.EndpointOptions.UseFIPSEndpoint == aws.FIPSEndpointStateEnabled),
-		Endpoint:     opts.BaseEndpoint,
+		Region:            aws.String(region),
+		UseDualStack:      aws.Bool(opts.EndpointOptions.UseDualStackEndpoint == aws.DualStackEndpointStateEnabled),
+		UseFIPS:           aws.Bool(opts.EndpointOptions.UseFIPSEndpoint == aws.FIPSEndpointStateEnabled),
+		Endpoint:          opts.BaseEndpoint,
+		UseGlobalEndpoint: aws.Bool(useDefaultResolver),
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve STS endpoint for region %q: %w", region, err)
+		return "", "", fmt.Errorf("failed to resolve STS endpoint for region %q: %w", region, err)
 	}
 
 	u := endpoint.URI
@@ -257,7 +269,16 @@ func resolveSTSEndpointURL(ctx context.Context, opts sts.Options) (string, error
 		u.Path = "/"
 	}
 
-	return u.String(), nil
+	signingRegion = region
+	if authOpts, ok := smithyauth.GetAuthOptions(&endpoint.Properties); ok {
+		for _, opt := range authOpts {
+			if r, ok := smithyhttp.GetSigV4SigningRegion(&opt.SignerProperties); ok && r != "" {
+				signingRegion = r
+				break
+			}
+		}
+	}
+	return u.String(), signingRegion, nil
 }
 
 func (c *Client) renew() error {
