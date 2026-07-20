@@ -441,6 +441,38 @@ func TestBuildIAMAuthPayload_DefaultPathUsesGlobalEndpointAndUSEast1Signing(t *t
 	require.Equal(t, "https://sts.amazonaws.com/", string(urlBytes))
 }
 
+// TestBuildIAMAuthPayload_CustomBaseEndpointIsUsedForURLAndSigning verifies that when
+// a caller configures a custom (non-default) STS BaseEndpoint on the AWS config -- e.g.
+// a VPC/FIPS/private STS endpoint -- that exact endpoint is used both for the
+// iam_request_url sent to Vault and for the SigV4 signing, using the configured region.
+func TestBuildIAMAuthPayload_CustomBaseEndpointIsUsedForURLAndSigning(t *testing.T) {
+	customEndpoint := "https://sts.custom.example.com"
+
+	stsSvc := sts.NewFromConfig(aws.Config{
+		Region:       "ap-south-1",
+		BaseEndpoint: aws.String(customEndpoint),
+		Credentials: aws.NewCredentialsCache(
+			credentials.NewStaticCredentialsProvider("AKIDEXAMPLE", "secret", "session-token"),
+		),
+	})
+
+	payload, err := buildIAMAuthPayload(context.Background(), hclog.NewNullLogger(), stsSvc, config.AuthConfig{Role: "example-role"})
+	require.NoError(t, err)
+
+	// The request URL sent to Vault should be the custom endpoint, not the default
+	// global/regional AWS STS endpoint.
+	encodedURL, ok := payload["iam_request_url"].(string)
+	require.True(t, ok)
+	urlBytes, err := base64.StdEncoding.DecodeString(encodedURL)
+	require.NoError(t, err)
+	require.Equal(t, customEndpoint+"/", string(urlBytes))
+
+	// Signing should use the configured region since a custom endpoint carries no
+	// AWS-provided signing region metadata of its own.
+	headers := decodeIAMRequestHeaders(t, payload)
+	require.Contains(t, headers.Get("Authorization"), "/ap-south-1/sts/")
+}
+
 func TestResolveSTSEndpointURL_DefaultsRegionToUSEast1(t *testing.T) {
 	resolver := &recordingSTSEndpointResolver{}
 
@@ -451,6 +483,45 @@ func TestResolveSTSEndpointURL_DefaultsRegionToUSEast1(t *testing.T) {
 	require.Equal(t, defaultSTSRegion, resolver.regionSeen)
 	require.Equal(t, "https://sts.us-east-1.amazonaws.com/", endpointURL)
 	require.Equal(t, defaultSTSRegion, signingRegion)
+}
+
+// TestResolveSTSEndpoint_CustomBaseEndpoint verifies that when opts.BaseEndpoint is set
+// (as happens when STSEndpointRegion is configured, or a caller supplies their own AWS
+// config with a custom endpoint), resolveSTSEndpoint resolves to that exact endpoint
+// and signs using the requested region, using the SDK's real default endpoint resolver.
+func TestResolveSTSEndpoint_CustomBaseEndpoint(t *testing.T) {
+	customEndpoint := "https://sts.custom.example.com"
+
+	endpointURL, signingRegion, err := resolveSTSEndpoint(context.Background(), sts.Options{
+		Region:       "ap-south-1",
+		BaseEndpoint: aws.String(customEndpoint),
+	}, false) // useDefaultResolver=false, matching how buildIAMAuthPayload calls this
+	// when a custom/regional endpoint is in play.
+	require.NoError(t, err)
+	require.Equal(t, customEndpoint+"/", endpointURL)
+	require.Equal(t, "ap-south-1", signingRegion)
+}
+
+// TestResolveSTSEndpoint_FallsBackToOptsRegionWhenAuthOptionsMissing verifies the
+// signingRegion fallback path: when the resolved endpoint has no auth-scheme
+// properties (GetAuthOptions returns ok=false), signingRegion must fall back to
+// opts.Region rather than silently defaulting elsewhere. Region is deliberately set
+// to something other than defaultSTSRegion so the assertion actually exercises the
+// fallback rather than passing by coincidence.
+func TestResolveSTSEndpoint_FallsBackToOptsRegionWhenAuthOptionsMissing(t *testing.T) {
+	resolver := &recordingSTSEndpointResolver{}
+
+	endpointURL, signingRegion, err := resolveSTSEndpoint(context.Background(), sts.Options{
+		Region:             "ap-south-1",
+		EndpointResolverV2: resolver,
+	}, false)
+	require.NoError(t, err)
+	require.Equal(t, "ap-south-1", resolver.regionSeen)
+	require.Equal(t, "https://sts.us-east-1.amazonaws.com/", endpointURL)
+	// recordingSTSEndpointResolver returns an Endpoint with no Properties set, so
+	// GetAuthOptions(&endpoint.Properties) returns ok=false and signingRegion must
+	// fall back to opts.Region ("ap-south-1"), not defaultSTSRegion ("us-east-1").
+	require.Equal(t, "ap-south-1", signingRegion)
 }
 
 func TestLogin_MissingCredentialsProviderReturnsMeaningfulError(t *testing.T) {
