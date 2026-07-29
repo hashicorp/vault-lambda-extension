@@ -1,15 +1,24 @@
 ## Unreleased
 
+## 0.15.0 (July 29, 2026)
+
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:26
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:14
+```
+
 IMPROVEMENTS:
 
 * Migrated AWS provider dependency from `aws-sdk-go` (v1) to `aws-sdk-go-v2` for improved performance and maintainability. (https://github.com/hashicorp/vault-lambda-extension/pull/191)
+* Building with Go 1.26.5
 * Bumped versions for the following dependencies:
   * github.com/fatih/color v1.19.0
-  * github.com/mattn/go-colorable v0.1.14
-  * golang.org/x/sys v0.46.0
-  * golang.org/x/crypto v0.53.0
-  * golang.org/x/net v0.56.0
-  * golang.org/x/text v0.38.0
+  * github.com/mattn/go-colorable v0.1.15
+  * golang.org/x/sys v0.47.0
+  * golang.org/x/crypto v0.54.0
+  * golang.org/x/net v0.57.0
+  * golang.org/x/text v0.40.0
   * github.com/go-jose/go-jose/v4 v4.1.4
 
 ## 0.14.0 (Mar 10, 2026)
