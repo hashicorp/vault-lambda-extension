@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright IBM Corp. 2020, 2025
+# Copyright IBM Corp. 2020, 2026
 # SPDX-License-Identifier: MPL-2.0
 
 # This script builds the demo-function and vault-lambda-extension into a Docker

@@ -1,4 +1,4 @@
-// Copyright IBM Corp. 2020, 2025
+// Copyright IBM Corp. 2020, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 // Package runmode determines if the vault lambda extension should run in default mode, file mode, or proxy mode.
