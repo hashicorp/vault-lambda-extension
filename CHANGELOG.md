@@ -1,13 +1,18 @@
-## Unreleased
+## 0.14.4 (October 23, 2026)
 
 IMPROVEMENTS:
 
 * Building with Go 1.27.1
 * Bumped versions for the following dependencies:
-  * golang.org/x/crypto v0.57.0
-  * golang.org/x/net v0.59.0
-  * golang.org/x/sys v0.48.0
-  * golang.org/x/text v0.42.0
+* golang.org/x/crypto v0.57.0
+* golang.org/x/net v0.59.0
+* golang.org/x/sys v0.48.0
+* golang.org/x/text v0.42.0
+* Update Go version to 1.27.1 and bump dependencies. ([#198](https://github.com/hashicorp/vault-lambda-extension/pull/198))
+
+DEPENDENCIES:
+
+* Bump github.com/go-jose/go-jose/v3 from 3.0.4 to 3.0.5 in /quick-start/demo-function ([#199](https://github.com/hashicorp/vault-lambda-extension/pull/199))
 
 ## 0.15.0 (July 29, 2026)
 
