@@ -1,13 +1,26 @@
-## Unreleased
+## 0.15.1 (November 10, 2026)
 
-IMPROVEMENTS:
+LAYERS:
+```
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension:27
+arn:aws:lambda:<AWS_REGION>:634166935893:layer:vault-lambda-extension-arm64:15
+```
 
-* Building with Go 1.27.1
+DEPENDENCY UPDATES:
+
+* Building with Go 1.27.3
 * Bumped versions for the following dependencies:
-  * golang.org/x/crypto v0.57.0
-  * golang.org/x/net v0.59.0
-  * golang.org/x/sys v0.48.0
-  * golang.org/x/text v0.42.0
+  * github.com/aws/aws-sdk-go-v2 v1.47.8
+  * github.com/aws/smithy-go v1.28.9
+  * github.com/hashicorp/vault/api v1.23.0
+  * github.com/hashicorp/vault/sdk v0.26.0
+  * github.com/stretchr/testify v1.12.1
+  * golang.org/x/crypto v0.58.0
+  * golang.org/x/net v0.62.0
+  * golang.org/x/sys v0.49.0
+  * golang.org/x/text v0.43.0
+* Update Go version to 1.27.3 and bump dependencies. ([#198](https://github.com/hashicorp/vault-lambda-extension/pull/198))
+* Bump github.com/go-jose/go-jose/v3 from 3.0.4 to 3.0.5 in /quick-start/demo-function ([#199](https://github.com/hashicorp/vault-lambda-extension/pull/199))
 
 ## 0.15.0 (July 29, 2026)
 
